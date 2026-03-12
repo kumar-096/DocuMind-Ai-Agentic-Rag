@@ -1,28 +1,38 @@
 from functools import lru_cache
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
+from dotenv import load_dotenv
 
+# ensure .env is loaded
+load_dotenv()
 
 class Settings(BaseSettings):
+    # App configuration
     app_name: str = "Agentic RAG Backend"
     environment: str = Field(default="development")
     debug: bool = Field(default=True)
+
+    # CORS configuration
     cors_allow_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
     )
     cors_allow_origin_regex: str | None = None
 
-    # LLM / Gemini
-    gemini_api_key: str | None = None
-    gemini_model: str = "gemini-1.5-flash"
+    # Gemini configuration
+    gemini_api_key: str | None = Field(default=None)
+    gemini_model: str = Field(default="gemini-2.5-flash")
 
-    # Vector store
-    vector_store_backend: str = "faiss"  # future: pgvector
+    # Vector store configuration
+    vector_store_backend: str = Field(default="faiss")
 
-    # Storage
-    storage_backend: str = "local"  # future: supabase
+    # Storage configuration
+    storage_backend: str = Field(default="local")
 
-    # Database
-    database_url: str = "sqlite:///./backend_data.db"
+    # Database configuration
+    database_url: str = Field(default="sqlite:///./backend_data.db")
 
     class Config:
         env_file = ".env"
@@ -32,4 +42,3 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-
