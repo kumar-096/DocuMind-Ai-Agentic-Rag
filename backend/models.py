@@ -28,7 +28,7 @@ class Chunk(Base):
     chunk_index = Column(Integer, nullable=False)
     text = Column(Text, nullable=False)
     embedding_id = Column(Integer, nullable=True)  # position in FAISS index
-    meta = Column("metadata", JSON, nullable=True)
+    meta = Column(JSON, nullable=True)
 
     document = relationship("Document", back_populates="chunks")
 

@@ -45,7 +45,9 @@ class RetrievalEngine:
         query_vec = np.array(query_emb, dtype=np.float32).reshape(1, -1)
 
         # Search FAISS index
-        vec_ids, scores = self.vector_store.search(query_vec, top_k=top_k)
+        vec_ids, scores = self.vector_store.search(query_vec, top_k=top_k * 10)
+
+        print("FAISS returned ids:", vec_ids)
 
         if not vec_ids:
             return []
