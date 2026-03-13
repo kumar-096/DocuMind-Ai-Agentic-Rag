@@ -30,7 +30,7 @@ class FaissVectorStore(VectorStore):
     def __init__(self, dim: int, index_path: str | None = None) -> None:
         self.dim = dim
 
-        base_dir = os.path.join("backend", "data", "index")
+        base_dir = os.path.join(os.path.dirname(__file__), "data", "index")
         os.makedirs(base_dir, exist_ok=True)
 
         self.index_path = index_path or os.path.join(base_dir, "faiss.index")

@@ -2,15 +2,17 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from dotenv import load_dotenv
+import os
 
-# ensure .env is loaded
+# Load environment variables from .env
 load_dotenv()
+
 
 class Settings(BaseSettings):
     # App configuration
     app_name: str = "Agentic RAG Backend"
-    environment: str = Field(default="development")
-    debug: bool = Field(default=True)
+    environment: str = "development"
+    debug: bool = True
 
     # CORS configuration
     cors_allow_origins: list[str] = Field(
@@ -22,21 +24,17 @@ class Settings(BaseSettings):
     cors_allow_origin_regex: str | None = None
 
     # Gemini configuration
-    gemini_api_key: str | None = Field(default=None)
-    gemini_model: str = Field(default="gemini-2.5-flash")
+    gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
+    gemini_model: str = "gemini-2.5-flash"
 
-    # Vector store configuration
-    vector_store_backend: str = Field(default="faiss")
+    # Vector store
+    vector_store_backend: str = "faiss"
 
-    # Storage configuration
-    storage_backend: str = Field(default="local")
+    # Storage
+    storage_backend: str = "local"
 
-    # Database configuration
-    database_url: str = Field(default="sqlite:///./backend_data.db")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    # Database
+    database_url: str = "sqlite:///./backend_data.db"
 
 
 @lru_cache(maxsize=1)
