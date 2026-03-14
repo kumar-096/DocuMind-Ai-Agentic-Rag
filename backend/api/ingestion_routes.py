@@ -64,3 +64,15 @@ def list_documents(db: Session = Depends(get_db)):
         for d in docs
     ]
 
+@router.delete("/documents/{doc_id}")
+def delete_document(doc_id: int, db: Session = Depends(get_db)):
+
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    db.delete(doc)
+    db.commit()
+
+    return {"status": "deleted"}

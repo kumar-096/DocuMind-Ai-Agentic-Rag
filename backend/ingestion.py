@@ -86,7 +86,7 @@ class DocumentIngestionService:
                     chunk_index=idx,
                     text=text,
                     embedding_id=vec_id,
-                    metadata=meta,
+                    meta=meta,
                 )
                 db.add(chunk)
 

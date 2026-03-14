@@ -1,15 +1,17 @@
 from contextlib import contextmanager
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
-
 from settings import get_settings
 
 settings = get_settings()
 
+print("DATABASE connected:", settings.DATABASE_URL)
+
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {},
+    settings.DATABASE_URL,
+    connect_args={"check_same_thread": False}
+    if settings.DATABASE_URL.startswith("sqlite")
+    else {},
 )
 
 SessionLocal = sessionmaker(
@@ -41,4 +43,3 @@ def db_session() -> Session:
         raise
     finally:
         db.close()
-

@@ -34,49 +34,139 @@ export interface ChatResponse {
   retrieved_chunks: RetrievedChunk[]
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 
-export async function uploadDocument(file: File): Promise<DocumentMetadata> {
-  const formData = new FormData()
-  formData.append('file', file)
 
-  const res = await fetch(`${BASE_URL}/api/ingest/upload`, {
-    method: 'POST',
-    body: formData,
+/* ---------- Fetch with timeout ---------- */
+
+export async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout = 30000
+) {
+
+  const controller = new AbortController()
+
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+  const response = await fetch(url, {
+    ...options,
+    signal: controller.signal
   })
+
+  clearTimeout(timeoutId)
+
+  return response
+}
+
+
+/* ---------- Retry helper ---------- */
+
+async function retryRequest(
+  fn: () => Promise<Response>,
+  retries = 2
+): Promise<Response> {
+
+  try {
+    return await fn()
+  } catch (error) {
+
+    if (retries <= 0) throw error
+
+    await new Promise((r) => setTimeout(r, 500))
+
+    return retryRequest(fn, retries - 1)
+  }
+}
+
+
+/* ---------- Upload document ---------- */
+
+export async function uploadDocument(
+  file: File
+): Promise<DocumentMetadata> {
+
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const res = await retryRequest(() =>
+    fetchWithTimeout(`${BASE_URL}/api/ingest/upload`, {
+      method: "POST",
+      body: formData
+    })
+  )
 
   if (!res.ok) {
     const msg = await res.text()
-    throw new Error(msg || 'Failed to upload document')
+    throw new Error(msg || "Failed to upload document")
   }
 
-  const data = (await res.json()) as { document: DocumentMetadata }
-  return data.document
+  const data = await res.json()
+
+  return data.document as DocumentMetadata
 }
+
+
+/* ---------- List documents ---------- */
 
 export async function listDocuments(): Promise<DocumentMetadata[]> {
-  const res = await fetch(`${BASE_URL}/api/ingest/documents`)
-  if (!res.ok) {
-    const msg = await res.text()
-    throw new Error(msg || 'Failed to load documents')
-  }
-  return (await res.json()) as DocumentMetadata[]
-}
 
-export async function askQuestion(payload: ChatRequest): Promise<ChatResponse> {
-  const res = await fetch(`${BASE_URL}/api/chat/ask`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+  const res = await retryRequest(() =>
+    fetchWithTimeout(`${BASE_URL}/api/ingest/documents`)
+  )
 
   if (!res.ok) {
     const msg = await res.text()
-    throw new Error(msg || 'Failed to get answer')
+    throw new Error(msg || "Failed to load documents")
   }
 
-  return (await res.json()) as ChatResponse
+  return await res.json()
 }
 
+
+/* ---------- Delete document ---------- */
+
+/* ---------- Delete document ---------- */
+
+export async function deleteDocument(id: number) {
+
+  const res = await retryRequest(() =>
+    fetchWithTimeout(`${BASE_URL}/api/ingest/documents/${id}`, {
+      method: "DELETE"
+    })
+  )
+
+  if (!res.ok) {
+    const msg = await res.text()
+    throw new Error(msg || "Failed to delete document")
+  }
+
+}
+
+
+/* ---------- Ask question ---------- */
+
+export async function askQuestion(
+  payload: ChatRequest
+): Promise<ChatResponse> {
+
+  const res = await retryRequest(() =>
+    fetchWithTimeout(`${BASE_URL}/api/chat/ask`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    })
+  )
+
+  if (!res.ok) {
+    const msg = await res.text()
+    throw new Error(msg || "Failed to get answer")
+  }
+
+  const data = await res.json()
+
+  return data as ChatResponse
+}
