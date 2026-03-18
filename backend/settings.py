@@ -4,6 +4,7 @@ from pydantic import Field
 
 
 class Settings(BaseSettings):
+
     app_name: str = "Agentic RAG Backend"
     environment: str = "development"
     debug: bool = True
@@ -15,16 +16,24 @@ class Settings(BaseSettings):
         ]
     )
 
+    # Authentication
+    secret_key: str
+    access_token_expire_minutes: int = 60 * 24
+
+    # Gemini
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
 
+    # Vector + storage
     vector_store_backend: str = "faiss"
     storage_backend: str = "local"
 
+    # Database
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/rag_agent"
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 
 @lru_cache

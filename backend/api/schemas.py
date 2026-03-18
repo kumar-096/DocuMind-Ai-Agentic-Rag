@@ -15,10 +15,10 @@ class DocumentMetadata(BaseModel):
 class UploadedDocumentResponse(BaseModel):
     document: DocumentMetadata
 
-
 class ChatRequest(BaseModel):
     query: str
-    top_k: int = 5
+    session_id: int
+    top_k: Optional[int] = 5
     document_ids: Optional[List[int]] = None
 
 

@@ -4,10 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import api_router
 from logging_config import configure_logging
 from settings import get_settings
+from db import Base, engine
+from api.chat_sessions_routes import router as session_router
+from api.auth_routes import router as auth_router
+# IMPORTANT: ensure models are imported before create_all
+import models
 
 
 def create_app() -> FastAPI:
+
     configure_logging()
+
     settings = get_settings()
 
     app = FastAPI(
@@ -15,24 +22,30 @@ def create_app() -> FastAPI:
         debug=settings.debug,
     )
 
-    from fastapi.middleware.cors import CORSMiddleware
-
-    origins = [
-    "http://localhost:5173",
-    ]
-
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173"
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    @app.on_event("startup")
+    def startup():
+        print("Creating database tables...")
+        Base.metadata.create_all(bind=engine)
 
+    # existing API routes
     app.include_router(api_router)
+
+    # NEW: session routes
+    app.include_router(session_router)
+    app.include_router(auth_router)
 
     return app
 
 
 app = create_app()
-

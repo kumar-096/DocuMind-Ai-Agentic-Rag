@@ -1,6 +1,8 @@
 from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+
 from settings import get_settings
 
 settings = get_settings()
@@ -9,9 +11,7 @@ print("DATABASE connected:", settings.DATABASE_URL)
 
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False}
-    if settings.DATABASE_URL.startswith("sqlite")
-    else {},
+    pool_pre_ping=True,
 )
 
 SessionLocal = sessionmaker(

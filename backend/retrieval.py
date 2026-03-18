@@ -34,10 +34,12 @@ class RetrievalEngine:
         self,
         db: Session,
         query: str,
+        user_id: int = None,   # ✅ make optional
         top_k: int = 5,
         document_ids: Optional[List[int]] = None,
-    ) -> List[RetrievedChunkDTO]:
-
+    ):
+        print("DEBUG: CORRECT search() LOADED")
+        print("SEARCH CALLED WITH:", user_id)
         # Generate query embedding
         query_emb = self.embedding_model.embed_text(query)
 
@@ -54,6 +56,10 @@ class RetrievalEngine:
 
         # Fetch matching chunks from database
         q = db.query(Chunk, Document).join(Document, Chunk.document_id == Document.id)
+
+# ✅ only apply filter if provided
+        if user_id is not None:
+            q = q.filter(Chunk.user_id == user_id)
         q = q.filter(Chunk.embedding_id.in_(vec_ids))
 
         if document_ids:

@@ -9,9 +9,11 @@ from api.schemas import ChatResponse, Citation, RetrievedChunk
 from llm_client import LlmClient
 from models import QueryLog
 from retrieval import RetrievalEngine
+from security.prompt_guard import sanitize_context
 
 
 class RagPipeline:
+
     def __init__(self) -> None:
         self.retrieval_engine = RetrievalEngine()
         self.llm_client = LlmClient()
@@ -20,56 +22,101 @@ class RagPipeline:
         self,
         db: Session,
         query: str,
+        user_id: int,
         top_k: int = 5,
         document_ids: Optional[List[int]] = None,
-    ) -> ChatResponse:
+    ):
+
         start = perf_counter()
+
         retrieved = self.retrieval_engine.search(
             db=db,
             query=query,
+            user_id=user_id,
             top_k=top_k,
             document_ids=document_ids,
         )
+
         latency_ms = int((perf_counter() - start) * 1000)
 
         if not retrieved:
-            answer = "I could not find relevant information in the indexed documents for your question."
-            response = ChatResponse(answer=answer, citations=[], retrieved_chunks=[])
-            self._log_query(db, query, latency_ms, num_results=0)
-            return response
+
+            answer = "No relevant information found."
+
+            return ChatResponse(
+                answer=answer,
+                citations=[],
+                retrieved_chunks=[]
+            )
 
         context_blocks = []
+
         for r in retrieved:
+
             meta = r.chunk.meta or {}
             page = meta.get("page")
+
             source_label = f"{r.document.filename}"
-            if page is not None:
+
+            if page:
                 source_label += f" page {page}"
-            source_tag = f"[source: {source_label}, chunk {r.chunk.chunk_index}]"
-            context_blocks.append(f"{source_tag}\n{r.chunk.text}")
+
+            context_blocks.append(
+                f"[source: {source_label} chunk {r.chunk.chunk_index}]\n{r.chunk.text}"
+            )
 
         context_text = "\n\n".join(context_blocks)
 
-        system_prompt = (
-            "You are a helpful assistant that answers user questions strictly based on the provided context.\n"
-            "Use only the information in the context to answer.\n"
-            "When you state facts, reference the sources in parentheses like (document.pdf page 3).\n"
-            "If the answer is not contained in the context, say you don't know."
-        )
+        # sanitize retrieved context against prompt injection
+        context_text = sanitize_context(context_text)
 
-        user_prompt = (
-            f"Context:\n{context_text}\n\n"
-            f"Question: {query}\n\n"
-            "Answer clearly and concisely, and include source references."
-        )
+        system_prompt = """
+You are a professional AI knowledge assistant.
 
-        answer_text = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
+Always answer in structured markdown format:
+
+# Short Answer
+2–3 sentence summary.
+
+## Explanation
+Detailed explanation.
+
+## Key Points
+Bullet points summarizing the important ideas.
+
+## Example
+Provide a practical example.
+
+## Flow Diagram
+Use ASCII diagrams when useful.
+
+## Sources
+Mention document references.
+
+Use only the provided context.
+"""
+
+        user_prompt = f"""
+Context:
+{context_text}
+
+Question:
+{query}
+"""
+
+        answer = self.llm_client.generate(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
 
         citations: List[Citation] = []
         retrieved_chunks: List[RetrievedChunk] = []
+
         for r in retrieved:
+
             meta = r.chunk.meta or {}
             page = meta.get("page")
+
             citations.append(
                 Citation(
                     document_id=r.document.id,
@@ -78,6 +125,7 @@ class RagPipeline:
                     chunk_index=r.chunk.chunk_index,
                 )
             )
+
             retrieved_chunks.append(
                 RetrievedChunk(
                     document_id=r.document.id,
@@ -89,15 +137,87 @@ class RagPipeline:
                 )
             )
 
-        self._log_query(db, query, latency_ms, num_results=len(retrieved))
-        return ChatResponse(answer=answer_text, citations=citations, retrieved_chunks=retrieved_chunks)
+        self._log_query(db, query, user_id, latency_ms, len(retrieved))
 
-    def _log_query(self, db: Session, query: str, latency_ms: int, num_results: int) -> None:
+        return ChatResponse(
+            answer=answer,
+            citations=citations,
+            retrieved_chunks=retrieved_chunks
+        )
+
+    def _log_query(
+        self,
+        db: Session,
+        query: str,
+        user_id: int,
+        latency_ms: int,
+        num_results: int
+    ):
+
         log = QueryLog(
+            user_id=user_id,
             query_text=query,
             latency_ms=latency_ms,
             num_results=num_results,
         )
+
         db.add(log)
         db.commit()
+    async def stream_answer(
+        self,
+        db: Session,
+        query: str,
+        user_id: int,
+        top_k: int = 5,
+        document_ids: Optional[List[int]] = None,
+    ):
+        import asyncio
+        from security.prompt_guard import sanitize_context
+        from services.llm_service import llm_stream_async
 
+        def run_retrieval():
+            return self.retrieval_engine.search(
+                db=db,
+                query=query,
+                user_id=user_id,
+                top_k=top_k,
+                document_ids=document_ids,
+            )
+
+        retrieved = await asyncio.to_thread(run_retrieval)
+
+        if not retrieved:
+            yield "No relevant information found."
+            return
+
+        context_blocks = []
+
+        for r in retrieved:
+            meta = r.chunk.meta or {}
+            page = meta.get("page")
+
+            source_label = r.document.filename
+            if page:
+                source_label += f" page {page}"
+
+            context_blocks.append(
+                f"[source: {source_label} chunk {r.chunk.chunk_index}]\n{r.chunk.text}"
+            )
+
+        context_text = "\n\n".join(context_blocks)
+        context_text = sanitize_context(context_text)
+
+        prompt = f"""
+    You are a professional AI assistant.
+
+    Answer ONLY using the provided context.
+
+    Context:
+    {context_text}
+
+    Question:
+    {query}
+    """
+
+        async for token in llm_stream_async(prompt):
+            yield token

@@ -1,29 +1,52 @@
-from functools import lru_cache
 from typing import List
-
 import numpy as np
-from sentence_transformers import SentenceTransformer
+
+from services.embedding_model import get_embedding_model
 
 
-@lru_cache(maxsize=1)
-def _get_model(model_name: str) -> SentenceTransformer:
-    return SentenceTransformer(model_name)
+_model = None
 
 
 class EmbeddingModel:
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> None:
-        self.model_name = model_name
-        self._model = _get_model(self.model_name)
+
+    def __init__(self) -> None:
+        global _model
+
+        if _model is None:
+            _model = get_embedding_model()
+
+        self._model = _model
+
+        # compute once
+        if not hasattr(self._model, "_cached_dimension"):
+            test_vec = self._model.encode(
+                ["test"],
+                convert_to_numpy=True,
+                batch_size=1,
+            )
+            self._model._cached_dimension = int(test_vec.shape[1])
+
+        self._dimension = self._model._cached_dimension
 
     @property
     def dimension(self) -> int:
-        # run a tiny dummy encode once to infer size
-        test_vec = self._model.encode(["test"], convert_to_numpy=True)
-        return int(test_vec.shape[1])
+        return self._dimension
 
     def embed_text(self, text: str) -> np.ndarray:
-        return self._model.encode([text], convert_to_numpy=True)[0]
+        return self._model.encode(
+            [text],
+            convert_to_numpy=True,
+            batch_size=1,
+        )[0]
 
     def embed_documents(self, texts: List[str]) -> np.ndarray:
-        return self._model.encode(texts, convert_to_numpy=True)
 
+        if not texts:
+            return np.array([])
+
+        return self._model.encode(
+            texts,
+            convert_to_numpy=True,
+            batch_size=64,
+            show_progress_bar=False,
+        )
