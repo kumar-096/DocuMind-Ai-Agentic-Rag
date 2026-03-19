@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import {
   askQuestionSSE,
   loadSessionMessages,
+  createSession,   // 🔥 ADD THIS
   type ChatResponse
 } from "../lib/api"
 
@@ -36,17 +37,19 @@ export function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   /* ---------------- Load session ---------------- */
-
   useEffect(() => {
 
     if (typeof sessionId !== "number") return
   
-    const stableSessionId = sessionId  // ✅ freeze value
+    let isCancelled = false
   
     async function loadMessages() {
   
       try {
-        const stored = await loadSessionMessages(stableSessionId)
+  
+        const stored = await loadSessionMessages(sessionId)
+  
+        if (isCancelled) return
   
         const mapped: Message[] = stored.map((m) => ({
           id: String(m.id),
@@ -56,12 +59,45 @@ export function ChatPage() {
   
         setMessages(mapped)
   
-      } catch (err) {
-        console.error(err)
+      } catch (err: any) {
+  
+        console.error("Session load failed:", err)
+  
+        if (isCancelled) return
+  
+        // 🔥 STEP 1 — CLEAR BROKEN STATE
+        setMessages([])
+        localStorage.removeItem("active_chat_session")
+  
+        try {
+  
+          // 🔥 STEP 2 — CREATE NEW SESSION
+          const newSession = await createSession()
+  
+          if (isCancelled) return
+  
+          // 🔥 STEP 3 — STORE IT
+          localStorage.setItem(
+            "active_chat_session",
+            newSession.id.toString()
+          )
+  
+          // 🔥 STEP 4 — FORCE RELOAD (important)
+          window.location.reload()
+  
+        } catch (createErr) {
+  
+          console.error("Failed to create new session:", createErr)
+  
+        }
       }
     }
   
     loadMessages()
+  
+    return () => {
+      isCancelled = true
+    }
   
   }, [sessionId])
   /* ---------------- Auto scroll ---------------- */

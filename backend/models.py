@@ -13,28 +13,53 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    token_version = Column(Integer, default=0)
+    documents = relationship(
+        "Document",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 
-    documents = relationship("Document", back_populates="user")
     queries = relationship(
         "QueryLog",
         back_populates="user",
         cascade="all, delete-orphan"
     )
 
+    sessions = relationship(
+        "ChatSession",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+
 class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        index=True
+    )
+
     filename = Column(String, nullable=False)
     original_path = Column(String, nullable=True)
     content_type = Column(String, nullable=False)
+
     num_chunks = Column(Integer, default=0)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="documents")
-    chunks = relationship("Chunk", back_populates="document", cascade="all, delete-orphan")
+
+    chunks = relationship(
+        "Chunk",
+        back_populates="document",
+        cascade="all, delete-orphan"
+    )
 
 
 class Chunk(Base):
@@ -62,27 +87,52 @@ class Chunk(Base):
 
     meta = Column(JSON, nullable=True)
 
-    document = relationship("Document", back_populates="chunks")
+    document = relationship(
+        "Document",
+        back_populates="chunks"
+    )
 
 
 class QueryLog(Base):
     __tablename__ = "queries"
 
     id = Column(Integer, primary_key=True, index=True)
+
     query_text = Column(Text, nullable=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
+
     latency_ms = Column(Integer, nullable=True)
+
     num_results = Column(Integer, nullable=True)
 
     user_id = Column(Integer, ForeignKey("users.id"))
-    user = relationship("User", back_populates="queries")
+
+    user = relationship(
+        "User",
+        back_populates="queries"
+    )
+
+
 class ChatSession(Base):
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        index=True
+    )
+
     title = Column(String, default="New Chat")
+
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship(
+        "User",
+        back_populates="sessions"
+    )
 
     messages = relationship(
         "ChatMessage",
@@ -102,9 +152,13 @@ class ChatMessage(Base):
         index=True,
     )
 
-    role = Column(String, nullable=False)  # user / assistant
+    role = Column(String, nullable=False)
+
     content = Column(Text, nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    session = relationship("ChatSession", back_populates="messages")
+    session = relationship(
+        "ChatSession",
+        back_populates="messages"
+    )

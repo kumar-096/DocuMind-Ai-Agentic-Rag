@@ -1,5 +1,4 @@
 from fastapi import Depends, HTTPException, status, Cookie
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -9,45 +8,26 @@ from models import User
 from core.security import SECRET_KEY, ALGORITHM
 
 
-security = HTTPBearer(auto_error=False)
-
-
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     access_token: Optional[str] = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> User:
-    """
-    Authenticate user using either:
-    1. Authorization header (Bearer token)
-    2. HTTPOnly cookie (access_token)
-    """
 
-    token = None
-
-    # Prefer Authorization header
-    if credentials:
-        token = credentials.credentials
-
-    # Fallback to cookie
-    elif access_token:
-        token = access_token
-
-    if not token:
+    if not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
         )
 
     try:
-
         payload = jwt.decode(
-            token,
+            access_token,
             SECRET_KEY,
             algorithms=[ALGORITHM],
         )
 
         user_id = payload.get("sub")
+        token_version = payload.get("token_version")
 
         if user_id is None:
             raise HTTPException(
@@ -56,7 +36,6 @@ def get_current_user(
             )
 
     except JWTError:
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
@@ -68,6 +47,13 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
+        )
+
+    # 🔥 CRITICAL: token invalidation check
+    if token_version != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
         )
 
     return user

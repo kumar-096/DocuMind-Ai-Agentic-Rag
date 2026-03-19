@@ -15,9 +15,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   async function checkAuth() {
-
     try {
-
       const res = await fetch(
         "http://localhost:8000/api/auth/me",
         {
@@ -25,11 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       )
 
-      if (res.ok) {
-        setAuthenticated(true)
-      } else {
-        setAuthenticated(false)
-      }
+      setAuthenticated(res.ok)
 
     } catch {
       setAuthenticated(false)
@@ -47,6 +41,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         credentials: "include"
       }
     )
+
+    // 🔥 CRITICAL FIX
+    localStorage.removeItem("active_chat_session")
 
     setAuthenticated(false)
   }

@@ -8,10 +8,6 @@ import {
 
 import type { ChatResponse } from "../lib/api"
 
-/* =====================================================
-   TYPES
-===================================================== */
-
 export type MessageRole = "user" | "assistant"
 
 export interface Message {
@@ -22,35 +18,23 @@ export interface Message {
 }
 
 interface ChatContextType {
-
-  /* messages */
   messages: Message[]
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
 
-  /* active session */
   sessionId: number | null
   setSessionId: (id: number | null) => void
 
-  /* helpers */
   resetChat: () => void
 }
 
-/* =====================================================
-   CONTEXT
-===================================================== */
-
 const ChatContext = createContext<ChatContextType | null>(null)
-
-/* =====================================================
-   PROVIDER
-===================================================== */
 
 export function ChatProvider({ children }: { children: ReactNode }) {
 
   const [messages, setMessages] = useState<Message[]>([])
   const [sessionId, setSessionIdState] = useState<number | null>(null)
 
-  /* ---------------- Restore session safely ---------------- */
+  /* ---------------- Restore session ---------------- */
 
   useEffect(() => {
 
@@ -59,7 +43,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (saved) {
       const parsed = Number(saved)
 
-      // ✅ prevent NaN corruption
       if (!isNaN(parsed)) {
         setSessionIdState(parsed)
       } else {
@@ -81,19 +64,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("active_chat_session", id.toString())
     }
 
-    // ✅ Reset messages ONLY when session explicitly changes
     setMessages([])
   }
 
-  /* ---------------- Reset chat manually ---------------- */
+  /* ---------------- HARD RESET ---------------- */
 
   function resetChat() {
     setMessages([])
+    setSessionIdState(null)
+    localStorage.removeItem("active_chat_session")
   }
-
-  /* =====================================================
-     PROVIDER VALUE
-  ===================================================== */
 
   return (
     <ChatContext.Provider
@@ -109,10 +89,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     </ChatContext.Provider>
   )
 }
-
-/* =====================================================
-   HOOK
-===================================================== */
 
 export function useChat() {
 

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from api.chat_routes import router as chat_router
 from api import api_router
 from logging_config import configure_logging
 from settings import get_settings
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     # NEW: session routes
     app.include_router(session_router)
     app.include_router(auth_router)
+    app.include_router(chat_router)
 
     return app
 

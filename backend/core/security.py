@@ -20,8 +20,7 @@ pwd_context = CryptContext(
 
 def hash_password(password: str) -> str:
 
-    print("DEBUG PASSWORD:", password)
-    print("DEBUG LENGTH:", len(password.encode("utf-8")))
+    
 
     if len(password.encode("utf-8")) > 72:
         password = password[:72]

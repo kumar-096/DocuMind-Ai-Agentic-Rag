@@ -3,9 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { LoginPage } from "./pages/auth/LoginPage"
 import { MainLayout } from "./components/layout/MainLayout"
 
-import { AuthProvider, useAuth } from "./context/AuthContext"
+import { useAuth } from "./context/AuthContext"
 import { SourceProvider } from "./context/SourceContext"
-import { ChatProvider } from "./context/ChatContext"
 
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -50,19 +49,11 @@ function AppRoutes() {
 function App() {
 
   return (
-
-    <AuthProvider>
-      <ChatProvider>
-        <SourceProvider>
-
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-
-        </SourceProvider>
-      </ChatProvider>
-    </AuthProvider>
-
+    <SourceProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </SourceProvider>
   )
 }
 
