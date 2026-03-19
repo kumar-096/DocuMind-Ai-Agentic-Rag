@@ -11,7 +11,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     token_version = Column(Integer, default=0)
     documents = relationship(
@@ -31,7 +31,40 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+# ADD BELOW User model
 
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from datetime import datetime
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    refresh_token_hash = Column(String, nullable=False)
+
+    ip_address = Column(String)
+    user_agent = Column(String)
+
+    is_active = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LoginAudit(Base):
+    __tablename__ = "login_audit"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String)
+    ip_address = Column(String)
+    user_agent = Column(String)
+
+    success = Column(Boolean)
+    reason = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class Document(Base):
     __tablename__ = "documents"
@@ -162,3 +195,21 @@ class ChatMessage(Base):
         "ChatSession",
         back_populates="messages"
     )
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+
+    # RAG controls
+    top_k = Column(Integer, default=5)
+    retrieval_mode = Column(String, default="semantic")  # semantic | hybrid
+
+    # LLM controls
+    temperature = Column(String, default="0.7")
+    model = Column(String, default="gemini")
+
+    # UX controls
+    streaming = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)

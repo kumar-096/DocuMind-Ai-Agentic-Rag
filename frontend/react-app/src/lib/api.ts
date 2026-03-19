@@ -343,3 +343,76 @@ export async function deleteSession(id: number) {
 
   if (!res.ok) throw new Error("Failed to delete session")
 }
+function getCSRFToken() {
+  const match = document.cookie.match(/csrf_token=([^;]+)/)
+  return match ? match[1] : ""
+}
+
+export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+
+  let res = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": getCSRFToken(),
+      ...(options.headers || {})
+    }
+  })
+
+  if (res.status === 401) {
+    console.warn("Session expired or suspicious activity")
+
+    const refreshRes = await fetch(
+      "http://localhost:8000/api/auth/refresh",
+      {
+        method: "POST",
+        credentials: "include"
+      }
+    )
+
+    if (!refreshRes.ok) {
+      throw new Error("Session expired")
+    }
+
+    res = await fetch(url, {
+      ...options,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": getCSRFToken(),
+        ...(options.headers || {})
+      }
+    })
+  }
+
+  return res
+}
+export async function getSettings() {
+  const res = await fetchWithAuth(`${BASE_URL}/api/settings/`)
+
+  if (!res.ok) throw new Error("Failed to fetch settings")
+
+  return res.json()
+}
+
+export async function updateSettings(data: any) {
+
+  const csrf = document.cookie
+    .split("; ")
+    .find(row => row.startsWith("csrf_token="))
+    ?.split("=")[1]
+
+  const res = await fetchWithAuth(`${BASE_URL}/api/settings/`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrf || ""
+    },
+    body: JSON.stringify(data)
+  })
+
+  if (!res.ok) throw new Error("Failed to update settings")
+
+  return res.json()
+}

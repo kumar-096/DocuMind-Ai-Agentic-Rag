@@ -76,14 +76,18 @@ def get_messages(
 
     messages = (
         db.query(ChatMessage)
-        .filter(ChatMessage.session_id == session_id)
+        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
+        .filter(
+            ChatMessage.session_id == session_id,
+            ChatSession.user_id == current_user.id
+        )
         .order_by(ChatMessage.created_at.asc())
         .all()
     )
 
     return [
         {
-            "id": m.id,   # 🔥 REQUIRED
+            "id": m.id,
             "role": m.role,
             "content": m.content,
             "created_at": m.created_at

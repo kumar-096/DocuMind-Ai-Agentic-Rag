@@ -7,6 +7,7 @@ from settings import get_settings
 from db import Base, engine
 from api.chat_sessions_routes import router as session_router
 from api.auth_routes import router as auth_router
+from api.settings_routes import router as settings_router
 # IMPORTANT: ensure models are imported before create_all
 import models
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(session_router)
     app.include_router(auth_router)
     app.include_router(chat_router)
+    app.include_router(settings_router)
 
     return app
 

@@ -34,7 +34,7 @@ class RetrievalEngine:
         self,
         db: Session,
         query: str,
-        user_id: int = None,   # ✅ make optional
+        user_id: int,   # ✅ make optional
         top_k: int = 5,
         document_ids: Optional[List[int]] = None,
     ):
@@ -56,14 +56,26 @@ class RetrievalEngine:
 
         # Fetch matching chunks from database
         q = db.query(Chunk, Document).join(Document, Chunk.document_id == Document.id)
-
+        if user_id is None:
+            raise ValueError("user_id is required")
 # ✅ only apply filter if provided
         if user_id is not None:
             q = q.filter(Chunk.user_id == user_id)
         q = q.filter(Chunk.embedding_id.in_(vec_ids))
 
         if document_ids:
-            q = q.filter(Chunk.document_id.in_(document_ids))
+    # 🔴 validate ownership FIRST
+            valid_docs = db.query(Document.id).filter(
+                Document.id.in_(document_ids),
+                Document.user_id == user_id
+            ).all()
+
+            valid_doc_ids = [d.id for d in valid_docs]
+
+            if not valid_doc_ids:
+                return []  # or raise error
+
+            q = q.filter(Chunk.document_id.in_(valid_doc_ids))
 
         rows = q.all()
 

@@ -23,33 +23,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       )
 
-      setAuthenticated(res.ok)
+      if (res.status === 401) {
+        // ✅ Expected when not logged in
+        setAuthenticated(false)
+        return
+      }
 
-    } catch {
+      if (!res.ok) {
+        throw new Error("Auth failed")
+      }
+
+      setAuthenticated(true)
+
+    } catch (err) {
+      console.error("Auth check error:", err)
       setAuthenticated(false)
     }
-
-    setLoading(false)
   }
 
   async function logout() {
 
-    await fetch(
-      "http://localhost:8000/api/auth/logout",
-      {
-        method: "POST",
-        credentials: "include"
-      }
-    )
+    try {
+      await fetch(
+        "http://localhost:8000/api/auth/logout",
+        {
+          method: "POST",
+          credentials: "include"
+        }
+      )
+    } catch (err) {
+      console.error("Logout failed:", err)
+    }
 
-    // 🔥 CRITICAL FIX
+    // 🔥 clear local session artifacts
     localStorage.removeItem("active_chat_session")
 
     setAuthenticated(false)
   }
 
   useEffect(() => {
-    checkAuth()
+    checkAuth().finally(() => {
+      setLoading(false)   // ✅ ALWAYS set after check
+    })
   }, [])
 
   return (

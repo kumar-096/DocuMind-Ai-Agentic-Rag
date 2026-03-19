@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # Authentication
     secret_key: str
     access_token_expire_minutes: int = 60 * 24
-
+    google_client_id: str
     # Gemini
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
