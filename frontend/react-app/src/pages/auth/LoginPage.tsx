@@ -39,6 +39,9 @@ export function LoginPage() {
         return
       }
 
+      // 🔥 allow cookie to be set before checking auth
+      await new Promise((r) => setTimeout(r, 300))
+
       await checkAuth()
       navigate("/")
 
@@ -73,7 +76,7 @@ export function LoginPage() {
           body: JSON.stringify({ token })
         }
       )
-  
+      console.log("GOOGLE LOGIN RESPONSE:", res.status)
       if (!res.ok) {
         const text = await res.text()
         console.error("Backend error:", text)
@@ -81,8 +84,8 @@ export function LoginPage() {
         return
       }
   
-      await checkAuth()
-      navigate("/")
+      // 🔥 force browser to reload so cookies apply
+      window.location.href = "/"
   
     } catch (err) {
       console.error(err)

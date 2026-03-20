@@ -27,37 +27,33 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # -----------------------------
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
 
-    # Access token
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,          # 🔥 MUST BE TRUE
+        samesite="none",      # 🔥 MUST BE NONE
         max_age=60 * 15
     )
 
-    # Refresh token
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=60 * 60 * 24 * 7
     )
 
-    # CSRF token (NOT httponly)
     csrf_token = secrets.token_urlsafe(32)
 
     response.set_cookie(
         key="csrf_token",
         value=csrf_token,
         httponly=False,
-        secure=False,
-        samesite="lax"
+        secure=True,
+        samesite="none"
     )
-
 
 # -----------------------------
 # CSRF VALIDATION
