@@ -51,7 +51,6 @@ export interface StoredMessage {
   content: string
 }
 
-
 /* =====================================================
    BASE URL
 ===================================================== */
@@ -59,9 +58,8 @@ export interface StoredMessage {
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 
-
 /* =====================================================
-   GLOBAL ABORT CONTROLLER (🔥 cancellation support)
+   GLOBAL ABORT CONTROLLER
 ===================================================== */
 
 let currentController: AbortController | null = null
@@ -72,7 +70,6 @@ export function cancelCurrentRequest() {
     currentController = null
   }
 }
-
 
 /* =====================================================
    FETCH WITH TIMEOUT
@@ -100,7 +97,6 @@ export async function fetchWithTimeout(
   return response
 }
 
-
 /* =====================================================
    RETRY HELPER
 ===================================================== */
@@ -122,7 +118,6 @@ async function retryRequest(
   }
 }
 
-
 /* =====================================================
    AUTH
 ===================================================== */
@@ -132,9 +127,7 @@ export async function loginUser(email: string, password: string) {
   const res = await retryRequest(() =>
     fetchWithTimeout(`${BASE_URL}/api/auth/login`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     })
   )
@@ -158,14 +151,11 @@ export async function logoutUser() {
   }
 }
 
-
 /* =====================================================
    DOCUMENT INGESTION
 ===================================================== */
 
-export async function uploadDocument(
-  file: File
-): Promise<DocumentMetadata> {
+export async function uploadDocument(file: File): Promise<DocumentMetadata> {
 
   const formData = new FormData()
   formData.append("file", file)
@@ -182,7 +172,15 @@ export async function uploadDocument(
     throw new Error(msg || "Failed to upload document")
   }
 
-  const data = await res.json()
+  let data
+
+  try {
+    data = await res.json()
+  } catch {
+    const text = await res.text()
+    console.error("Invalid JSON:", text)
+    throw new Error("Invalid server response")
+  }
   return data.document
 }
 
@@ -210,10 +208,14 @@ export async function deleteDocument(id: number) {
   }
 }
 
-
 /* =====================================================
-   CHAT (🔥 PRODUCTION STREAMING VERSION)
+   CHAT (FIXED SSE)
 ===================================================== */
+
+function getCSRFToken() {
+  const match = document.cookie.match(/csrf_token=([^;]+)/)
+  return match ? match[1] : ""
+}
 
 export function askQuestionSSE(
   payload: ChatRequest,
@@ -228,12 +230,30 @@ export function askQuestionSSE(
     method: "POST",
     credentials: "include",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "X-CSRF-Token": getCSRFToken() // ✅ FIX
     },
     body: JSON.stringify(payload),
     signal: controller.signal
   })
-    .then(res => {
+    .then(async res => {
+
+      if (res.status === 401) {
+
+        const refreshRes = await fetch(
+          `${BASE_URL}/api/auth/refresh`, // ✅ FIX
+          {
+            method: "POST",
+            credentials: "include"
+          }
+        )
+
+        if (!refreshRes.ok) {
+          return onError("Session expired")
+        }
+
+        return askQuestionSSE(payload, onToken, onDone, onError)
+      }
 
       if (!res.body) throw new Error("No stream")
 
@@ -264,19 +284,9 @@ export function askQuestionSSE(
               try {
                 const json = JSON.parse(chunk.replace("data: ", ""))
 
-                if (json.token) {
-                  onToken(json.token)
-                }
-
-                if (json.done) {
-                  onDone()
-                  return
-                }
-
-                if (json.error) {
-                  onError(json.error)
-                  return
-                }
+                if (json.token) onToken(json.token)
+                if (json.done) return onDone()
+                if (json.error) return onError(json.error)
 
               } catch (err) {
                 console.error("JSON parse error", err)
@@ -298,55 +308,39 @@ export function askQuestionSSE(
 
   return () => controller.abort()
 }
+
 /* =====================================================
-   CHAT SESSIONS
+   CHAT SESSIONS (UNCHANGED)
 ===================================================== */
 
 export async function createSession(): Promise<ChatSession> {
-
-  const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/`, {
-    method: "POST"
-  })
-
+  const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/`, { method: "POST" })
   if (!res.ok) throw new Error("Failed to create session")
-
   return res.json()
 }
 
 export async function listSessions(): Promise<ChatSession[]> {
-
   const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/`)
-
   if (!res.ok) throw new Error("Failed to load sessions")
-
   return res.json()
 }
 
-export async function loadSessionMessages(
-  sessionId: number
-): Promise<StoredMessage[]> {
-
-  const res = await fetchWithTimeout(
-    `${BASE_URL}/api/sessions/${sessionId}/messages`
-  )
-
+export async function loadSessionMessages(sessionId: number): Promise<StoredMessage[]> {
+  const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/${sessionId}/messages`)
   if (!res.ok) throw new Error("Failed to load messages")
-
   return res.json()
 }
 
 export async function deleteSession(id: number) {
-
   const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/${id}`, {
     method: "DELETE"
   })
-
   if (!res.ok) throw new Error("Failed to delete session")
 }
-function getCSRFToken() {
-  const match = document.cookie.match(/csrf_token=([^;]+)/)
-  return match ? match[1] : ""
-}
+
+/* =====================================================
+   AUTH FETCH FIX
+===================================================== */
 
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
@@ -361,10 +355,9 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   })
 
   if (res.status === 401) {
-    console.warn("Session expired or suspicious activity")
 
     const refreshRes = await fetch(
-      "http://localhost:8000/api/auth/refresh",
+      `${BASE_URL}/api/auth/refresh`, // ✅ FIX
       {
         method: "POST",
         credentials: "include"
@@ -388,11 +381,14 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
   return res
 }
+
+/* =====================================================
+   SETTINGS (UNCHANGED)
+===================================================== */
+
 export async function getSettings() {
   const res = await fetchWithAuth(`${BASE_URL}/api/settings/`)
-
   if (!res.ok) throw new Error("Failed to fetch settings")
-
   return res.json()
 }
 

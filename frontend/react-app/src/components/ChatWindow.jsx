@@ -1,4 +1,12 @@
 import { useEffect, useState } from "react";
+import {
+  listSessions,
+  createSession,
+  loadSessionMessages,
+  deleteSession,
+  askQuestionSSE,
+  getSettings
+} from "../lib/api";
 
 /* ---------------- MESSAGE ---------------- */
 
@@ -27,29 +35,35 @@ function ChatWindow() {
 
   const [input, setInput] = useState("");
   const [streamingText, setStreamingText] = useState("");
+  const [settings, setSettings] = useState(null);
 
-  // ---------------- LOAD SESSIONS ----------------
+  /* ---------------- LOAD SETTINGS ---------------- */
+  useEffect(() => {
+    getSettings().then(setSettings).catch(console.error);
+  }, []);
+
+  /* ---------------- LOAD SESSIONS ---------------- */
   const loadSessions = async () => {
-    const res = await fetch("/api/sessions/", {
-      credentials: "include",
-    });
+    try {
+      const data = await listSessions();
+      setSessions(data);
 
-    const data = await res.json();
-    setSessions(data);
-
-    if (data.length > 0) {
-      setActiveSession(data[0]);
+      if (data.length > 0) {
+        setActiveSession(data[0]);
+      }
+    } catch (err) {
+      console.error("Session load error:", err);
     }
   };
 
-  // ---------------- LOAD MESSAGES ----------------
+  /* ---------------- LOAD MESSAGES ---------------- */
   const loadMessages = async (sessionId) => {
-    const res = await fetch(`/api/sessions/${sessionId}/messages`, {
-      credentials: "include",
-    });
-
-    const data = await res.json();
-    setMessages(data);
+    try {
+      const data = await loadSessionMessages(sessionId);
+      setMessages(data);
+    } catch (err) {
+      console.error("Message load error:", err);
+    }
   };
 
   useEffect(() => {
@@ -62,51 +76,54 @@ function ChatWindow() {
     }
   }, [activeSession]);
 
-  // ---------------- CREATE CHAT ----------------
+  /* ---------------- CREATE CHAT ---------------- */
   const createChat = async () => {
-    const res = await fetch("/api/sessions/", {
-      method: "POST",
-      credentials: "include",
-    });
-
-    const newSession = await res.json();
-
-    setSessions((prev) => [newSession, ...prev]);
-    setActiveSession(newSession);
-    setMessages([]);
-  };
-
-  // ---------------- DELETE CHAT ----------------
-  const deleteChat = async (id) => {
-    await fetch(`/api/sessions/${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-
-    const updated = sessions.filter((s) => s.id !== id);
-    setSessions(updated);
-
-    if (updated.length > 0) {
-      setActiveSession(updated[0]);
-    } else {
+    try {
+      const newSession = await createSession();
+      setSessions((prev) => [newSession, ...prev]);
+      setActiveSession(newSession);
       setMessages([]);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  // ---------------- RENAME CHAT ----------------
+  /* ---------------- DELETE CHAT ---------------- */
+  const deleteChat = async (id) => {
+    try {
+      await deleteSession(id);
+
+      const updated = sessions.filter((s) => s.id !== id);
+      setSessions(updated);
+
+      if (updated.length > 0) {
+        setActiveSession(updated[0]);
+      } else {
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  /* ---------------- RENAME CHAT ---------------- */
   const renameChat = async (id) => {
     const title = prompt("Enter new title:");
     if (!title) return;
 
-    await fetch(`/api/sessions/${id}?title=${title}`, {
-      method: "PUT",
-      credentials: "include",
-    });
+    try {
+      await fetch(`/api/sessions/${id}?title=${title}`, {
+        method: "PUT",
+        credentials: "include",
+      });
 
-    loadSessions();
+      loadSessions();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // ---------------- SEND MESSAGE ----------------
+  /* ---------------- SEND MESSAGE ---------------- */
   const sendMessage = async () => {
     if (!input.trim() || !activeSession) return;
 
@@ -119,57 +136,31 @@ function ChatWindow() {
 
     setInput("");
 
-    const res = await fetch("/api/chat/ask", {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query: userMessage,
-        session_id: activeSession.id,
-      }),
-    });
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-
-    let buffer = "";
     let fullText = "";
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    askQuestionSSE(
+      {
+        query: userMessage,
+        session_id: activeSession.id,
+        top_k: settings?.top_k || 5
+      },
+      (token) => {
+        fullText += token;
 
-      buffer += decoder.decode(value, { stream: true });
+        setStreamingText(fullText);
+      },
+      () => {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: fullText },
+        ]);
 
-      let parts = buffer.split("\n\n");
-      buffer = parts.pop();
-
-      for (let part of parts) {
-        if (part.startsWith("data: ")) {
-          const data = JSON.parse(part.replace("data: ", ""));
-
-          if (data.token) {
-            fullText += data.token;
-
-            if (fullText.length % 25 === 0) {
-              setStreamingText(fullText);
-            }
-          }
-
-          if (data.done) {
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", content: fullText },
-            ]);
-
-            setStreamingText("");
-            fullText = "";
-          }
-        }
+        setStreamingText("");
+      },
+      (err) => {
+        console.error("Streaming error:", err);
       }
-    }
+    );
   };
 
   return (
@@ -208,7 +199,7 @@ function ChatWindow() {
       <div className="flex flex-col flex-1">
 
         {/* CHAT */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-700">
           {messages.map((msg, i) => (
             <ChatMessage key={i} role={msg.role} content={msg.content} />
           ))}
@@ -219,7 +210,7 @@ function ChatWindow() {
         </div>
 
         {/* INPUT */}
-        <div className="p-4 border-t border-gray-800 flex gap-2">
+        <div className="sticky bottom-0 p-4 border-t border-gray-800 flex gap-2 bg-black">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}

@@ -6,6 +6,7 @@ import SettingsPage from "./pages/SettingsPage"
 
 import { useAuth } from "./context/AuthContext"
 import { SourceProvider } from "./context/SourceContext"
+import { ToastProvider } from "./context/ToastContext"   // ✅ NEW
 
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -33,10 +34,8 @@ function AppRoutes() {
   return (
     <Routes>
 
-      {/* LOGIN */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* MAIN APP */}
       <Route
         path="/"
         element={
@@ -46,7 +45,6 @@ function AppRoutes() {
         }
       />
 
-      {/* SETTINGS (NEW) */}
       <Route
         path="/settings"
         element={
@@ -65,9 +63,11 @@ function App() {
 
   return (
     <SourceProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <ToastProvider> {/* ✅ GLOBAL TOAST SYSTEM */}
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </ToastProvider>
     </SourceProvider>
   )
 }

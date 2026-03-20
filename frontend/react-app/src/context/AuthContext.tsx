@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react"
 
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
+
 type AuthContextType = {
   isAuthenticated: boolean
   loading: boolean
@@ -17,14 +20,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function checkAuth() {
     try {
       const res = await fetch(
-        "http://localhost:8000/api/auth/me",
+        `${BASE_URL}/api/auth/me`,
         {
           credentials: "include"
         }
       )
 
       if (res.status === 401) {
-        // ✅ Expected when not logged in
         setAuthenticated(false)
         return
       }
@@ -43,9 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function logout() {
 
+    const confirmLogout = window.confirm("Are you sure you want to logout?")
+    if (!confirmLogout) return
+
     try {
       await fetch(
-        "http://localhost:8000/api/auth/logout",
+        `${BASE_URL}/api/auth/logout`,
         {
           method: "POST",
           credentials: "include"
@@ -55,15 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Logout failed:", err)
     }
 
-    // 🔥 clear local session artifacts
     localStorage.removeItem("active_chat_session")
-
     setAuthenticated(false)
   }
 
   useEffect(() => {
     checkAuth().finally(() => {
-      setLoading(false)   // ✅ ALWAYS set after check
+      setLoading(false)
     })
   }, [])
 

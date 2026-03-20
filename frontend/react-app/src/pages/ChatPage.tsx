@@ -1,18 +1,17 @@
 import type { FormEvent } from "react"
 import { useEffect, useRef, useState } from "react"
-
 import {
+  getSettings,
+  cancelCurrentRequest,
   askQuestionSSE,
   loadSessionMessages,
-  createSession,   // 🔥 ADD THIS
-  type ChatResponse
+  createSession
 } from "../lib/api"
 
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { motion } from "framer-motion"
 
-import { useSource } from "../context/SourceContext"
 import { useChat } from "../context/ChatContext"
 
 type MessageRole = "user" | "assistant"
@@ -21,188 +20,212 @@ interface Message {
   id: string
   role: MessageRole
   content: string
-  response?: ChatResponse
 }
 
 export function ChatPage() {
 
-  const { setSource } = useSource()
-  const { sessionId } = useChat() as { sessionId: number | null }
+  const { sessionId, setSessionId, messages, setMessages } = useChat()
 
-  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [settings, setSettings] = useState<any>(null)
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const assistantRef = useRef<string | null>(null)
 
-  /* ---------------- Load session ---------------- */
+  const queue = useRef<string[]>([])
+  const streaming = useRef(false)
+
+  /* ---------------- SETTINGS ---------------- */
+  useEffect(() => {
+    getSettings().then(setSettings).catch(console.error)
+  }, [])
+
+  /* ---------------- LOAD SESSION ---------------- */
   useEffect(() => {
 
-    if (typeof sessionId !== "number") return
-  
-    let isCancelled = false
-  
+    if (!sessionId) return
+
+    let cancelled = false
+
     async function loadMessages() {
-  
       try {
-  
+
         const stored = await loadSessionMessages(sessionId)
-  
-        if (isCancelled) return
-  
-        const mapped: Message[] = stored.map((m) => ({
+        if (cancelled) return
+
+        setMessages(stored.map(m => ({
           id: String(m.id),
           role: m.role,
           content: m.content
-        }))
-  
-        setMessages(mapped)
-  
-      } catch (err: any) {
-  
-        console.error("Session load failed:", err)
-  
-        if (isCancelled) return
-  
-        // 🔥 STEP 1 — CLEAR BROKEN STATE
-        setMessages([])
-        localStorage.removeItem("active_chat_session")
-  
-        try {
-  
-          // 🔥 STEP 2 — CREATE NEW SESSION
-          const newSession = await createSession()
-  
-          if (isCancelled) return
-  
-          // 🔥 STEP 3 — STORE IT
-          localStorage.setItem(
-            "active_chat_session",
-            newSession.id.toString()
-          )
-  
-          // 🔥 STEP 4 — FORCE RELOAD (important)
-          window.location.reload()
-  
-        } catch (createErr) {
-  
-          console.error("Failed to create new session:", createErr)
-  
-        }
+        })))
+
+      } catch {
+        const newSession = await createSession()
+        if (!cancelled) setSessionId(newSession.id)
       }
     }
-  
+
     loadMessages()
+    return () => { cancelled = true }
+
+  }, [sessionId])
+
+  /* ---------------- AUTO SCROLL ---------------- */
+  useEffect(() => {
+    const el = messagesEndRef.current
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  /* ---------------- STREAM ENGINE (IMPROVED) ---------------- */
+  useEffect(() => {
+
+    if (streaming.current) return
+    streaming.current = true
   
-    return () => {
-      isCancelled = true
+    function process() {
+  
+      if (queue.current.length === 0) {
+        if (!loading) streaming.current = false
+        else setTimeout(process, 20)
+        return
+      }
+  
+      const next = queue.current.shift() || ""
+  
+      setMessages(prev => {
+        const updated = [...prev]
+        const i = updated.findIndex(m => m.id === assistantRef.current)
+        if (i !== -1) updated[i].content += next
+        return updated
+      })
+  
+      // 🔥 HUMAN-LIKE DELAY ENGINE
+      let delay = 15
+  
+      if (next === " ") delay = 8
+      else if (next === "." || next === "," || next === "\n") delay = 80
+      else if (/[A-Z]/.test(next)) delay = 25
+  
+      // slight randomness (key realism factor)
+      delay += Math.random() * 10
+  
+      setTimeout(process, delay)
     }
   
-  }, [sessionId])
-  /* ---------------- Auto scroll ---------------- */
+    process()
+  
+  }, [loading])
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, loading])
+  /* ---------------- COPY ---------------- */
+  function copy(text: string) {
+    navigator.clipboard.writeText(text)
+  }
 
-  /* ---------------- Edit ---------------- */
+  /* ---------------- STOP ---------------- */
+  function stopGeneration() {
+    cancelCurrentRequest()
+    setLoading(false)
+    queue.current = []
+    streaming.current = false
+  }
 
-  function editMessage(message: Message) {
+  /* ---------------- FILTER TOKENS ---------------- */
+  function isValidToken(token: string) {
+    const bad = ["Copy", "Stop", "Regenerate"]
+    return !bad.some(b => token.includes(b))
+  }
 
-    setInput(message.content)
+  /* ---------------- REGENERATE ---------------- */
+  function regenerate(lastUserMessage: string) {
 
-    setMessages(prev =>
-      prev.filter((_, index) =>
-        index <= prev.findIndex(x => x.id === message.id)
-      )
+    if (loading) return // prevent stacking
+
+    setLoading(true)
+
+    const assistantId = crypto.randomUUID()
+    assistantRef.current = assistantId
+
+    setMessages(prev => [
+      ...prev,
+      { id: assistantId, role: "assistant", content: "" }
+    ])
+
+    queue.current = []
+    streaming.current = false
+
+    askQuestionSSE(
+      {
+        query: lastUserMessage,
+        session_id: sessionId!,
+        top_k: settings?.top_k || 5
+      },
+      (token) => {
+        if (!token.includes("Thinking") && isValidToken(token)) {
+          queue.current.push(token)
+        }
+      },
+      () => setLoading(false),
+      () => {
+        setError("Retry failed")
+        setLoading(false)
+      }
     )
   }
 
-  /* ---------------- Submit ---------------- */
-
+  /* ---------------- SUBMIT ---------------- */
   async function handleSubmit(e: FormEvent) {
 
     e.preventDefault()
 
-    const trimmed = input.trim()
-
-    if (!trimmed || loading) return
-
-    if (!sessionId) {
-      setError("No active chat session.")
-      return
-    }
+    if (!input.trim() || loading || !sessionId) return
 
     setError(null)
 
-    // USER
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      content: trimmed
+      content: input
     }
 
     setMessages(prev => [...prev, userMessage])
-
     setInput("")
     setLoading(true)
 
-    // ASSISTANT
     const assistantId = crypto.randomUUID()
+    assistantRef.current = assistantId
 
-    const assistantMessage: Message = {
-      id: assistantId,
-      role: "assistant",
-      content: ""
-    }
+    setMessages(prev => [
+      ...prev,
+      { id: assistantId, role: "assistant", content: "" }
+    ])
 
-    setMessages(prev => [...prev, assistantMessage])
+    queue.current = []
+    streaming.current = false
 
-    let fullAnswer = ""
-
-    try {
-
-      askQuestionSSE(
-        {
-          query: trimmed,
-          session_id: sessionId,
-          top_k: 5
-        },
-        (token) => {
-
-          fullAnswer += token
-
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === assistantId
-                ? { ...m, content: fullAnswer }
-                : m
-            )
-          )
-
-        },
-        () => {
-          setLoading(false)
-        },
-        (err) => {
-          console.error(err)
-          setError("Streaming error")
-          setLoading(false)
+    askQuestionSSE(
+      {
+        query: userMessage.content,
+        session_id: sessionId,
+        top_k: settings?.top_k || 5
+      },
+      (token) => {
+        if (!token.includes("Thinking") && isValidToken(token)) {
+          queue.current.push(token)
         }
-      )
-
-    } catch (err) {
-      console.error(err)
-      setError("Something went wrong")
-      setLoading(false)
-    }
+      },
+      () => setLoading(false),
+      () => {
+        setError("Streaming error")
+        setLoading(false)
+      }
+    )
   }
 
-  /* ---------------- Enter key ---------------- */
-
+  /* ---------------- ENTER ---------------- */
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       e.currentTarget.form?.requestSubmit()
@@ -214,38 +237,76 @@ export function ChatPage() {
     <div className="flex h-full flex-col">
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-
         <div className="mx-auto max-w-3xl space-y-6">
 
-          {messages.map((m) => (
+          {messages.map((m, index) => (
 
-            <div key={m.id} className="space-y-2">
+            <div key={m.id} className="group space-y-2">
 
               <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
 
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`max-w-[80%] rounded-xl px-4 py-3 text-sm ${
+                  className={`max-w-[80%] rounded-xl px-5 py-4 text-sm leading-relaxed ${
                     m.role === "user"
                       ? "bg-blue-600 text-white"
                       : "bg-slate-800 text-slate-50"
                   }`}
                 >
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code({ inline, children }) {
+                        return inline ? (
+                          <code className="bg-slate-700 px-1 rounded">{children}</code>
+                        ) : (
+                          <div className="relative">
+                            <pre className="bg-black p-3 rounded overflow-x-auto">
+                              <code>{children}</code>
+                            </pre>
+
+                            <button
+                              onClick={() => copy(String(children))}
+                              className="absolute top-2 right-2 text-xs bg-slate-700 px-2 py-1 rounded opacity-0 group-hover:opacity-100"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        )
+                      }
+                    }}
+                  >
                     {m.content}
                   </ReactMarkdown>
+
                 </motion.div>
 
               </div>
 
-              {m.role === "user" && (
-                <button
-                  onClick={() => editMessage(m)}
-                  className="text-xs text-blue-400 cursor-pointer"
-                >
-                  Edit
-                </button>
+              {/* ACTIONS */}
+              {m.role === "assistant" && (
+                <div className="flex gap-3 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
+
+                  <button onClick={() => copy(m.content)} className="hover:text-white">
+                    Copy
+                  </button>
+
+                  <button onClick={stopGeneration} className="hover:text-red-400">
+                    Stop
+                  </button>
+
+                  {index > 0 && messages[index - 1].role === "user" && (
+                    <button
+                      onClick={() => regenerate(messages[index - 1].content)}
+                      className="hover:text-yellow-400"
+                    >
+                      Regenerate
+                    </button>
+                  )}
+
+                </div>
               )}
 
             </div>
@@ -258,37 +319,29 @@ export function ChatPage() {
             </div>
           )}
 
-          {error && (
-            <div className="text-sm text-red-400">
-              {error}
-            </div>
-          )}
+          {error && <div className="text-red-400 text-sm">{error}</div>}
 
           <div ref={messagesEndRef} />
 
         </div>
-
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="border-t border-slate-800 bg-slate-950 p-4"
-      >
+      <form onSubmit={handleSubmit} className="sticky bottom-0 p-4 bg-slate-950 border-t">
 
-        <div className="mx-auto max-w-3xl flex gap-3">
+        <div className="max-w-3xl mx-auto flex gap-3">
 
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 resize-none rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50"
-            placeholder="Ask about your documents..."
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+            placeholder="Ask..."
           />
 
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-blue-600 px-5 text-sm text-white hover:bg-blue-500"
+            className="bg-blue-600 px-5 rounded-lg text-white hover:bg-blue-500 transition"
           >
             Send
           </button>
