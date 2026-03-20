@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from db import get_db
 from models import ChatSession, ChatMessage, User
 from core.auth_dependency import get_current_user
-
+from pydantic import BaseModel
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
@@ -31,17 +31,23 @@ def create_session(
 # ---------------- LIST SESSIONS ----------------
 @router.get("/")
 def list_sessions(
+    search: str = "",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    sessions = (
-        db.query(ChatSession)
-        .filter(ChatSession.user_id == current_user.id)
-        .order_by(ChatSession.created_at.desc())
-        .all()
-    )
+    q = db.query(ChatSession).filter(ChatSession.user_id == current_user.id)
 
-    return sessions
+    # 🔥 filter archived
+    q = q.filter(ChatSession.is_archived == False)
+
+    # 🔥 search
+    if search:
+        q = q.filter(ChatSession.title.ilike(f"%{search}%"))
+
+    return q.order_by(
+        ChatSession.is_pinned.desc(),
+        ChatSession.created_at.desc()
+    ).all()
 
 
 # ---------------- GET MESSAGES ----------------
@@ -122,3 +128,66 @@ def delete_session(
     db.commit()
 
     return {"message": "deleted"}
+class RenamePayload(BaseModel):
+    title: str
+
+
+@router.put("/{session_id}/rename")
+def rename_session(
+    session_id: int,
+    payload: RenamePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.title = payload.title
+    db.commit()
+
+    return {"message": "renamed"}
+
+
+@router.put("/{session_id}/archive")
+def archive_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.is_archived = True
+    db.commit()
+
+    return {"message": "archived"}
+
+
+@router.put("/{session_id}/pin")
+def toggle_pin(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.is_pinned = not session.is_pinned
+    db.commit()
+
+    return {"message": "toggled"}

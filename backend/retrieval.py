@@ -28,6 +28,8 @@ class RetrievalEngine:
         self.embedding_model = embedding_model or EmbeddingModel()
         self.vector_store = get_vector_store(dim=self.embedding_model.dimension)
 
+        # 🔥 NEW CACHE
+        self.embedding_cache = {}
     # -----------------------------
     # FETCH DB CHUNKS (UNCHANGED)
     # -----------------------------
@@ -78,7 +80,11 @@ class RetrievalEngine:
         top_k: int,
         document_ids: Optional[List[int]],
     ):
-        query_emb = self.embedding_model.embed_text(query)
+        if query in self.embedding_cache:
+            query_emb = self.embedding_cache[query]
+        else:
+            query_emb = self.embedding_model.embed_text(query)
+            self.embedding_cache[query] = query_emb
         query_vec = np.array(query_emb, dtype=np.float32).reshape(1, -1)
 
         vec_ids, scores = self.vector_store.search(query_vec, top_k=top_k * 10)

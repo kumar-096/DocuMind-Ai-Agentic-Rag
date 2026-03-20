@@ -8,16 +8,14 @@ from settings import get_settings
 
 class LlmClient:
 
-    def __init__(self, model_name: Optional[str] = None) -> None:
+    def __init__(self) -> None:
         settings = get_settings()
 
         if not settings.gemini_api_key:
-            raise RuntimeError(
-                "GEMINI_API_KEY is missing. Add it to your .env file."
-            )
+            raise RuntimeError("GEMINI_API_KEY missing")
 
         self.client = genai.Client(api_key=settings.gemini_api_key)
-        self.default_model = model_name or settings.gemini_model
+        self.gemini_model = settings.gemini_model
 
     def generate(
         self,
@@ -33,10 +31,13 @@ User Question:
 {user_prompt}
 """
 
-        # ✅ model switching (basic)
-        model_name = self.default_model
+        # 🔥 REAL MODEL SWITCH
         if model == "gemini":
-            model_name = self.default_model
+            model_name = self.gemini_model
+        elif model == "fast":
+            model_name = "gemini-1.5-flash"
+        else:
+            model_name = self.gemini_model
 
         try:
             response = self.client.models.generate_content(
@@ -47,17 +48,15 @@ User Question:
                 }
             )
 
-            if response and hasattr(response, "text") and response.text:
+            if response and getattr(response, "text", None):
                 return response.text.strip()
 
             if response and hasattr(response, "candidates"):
-                candidates = response.candidates
-                if candidates:
-                    parts = candidates[0].content.parts
-                    if parts:
-                        return parts[0].text.strip()
+                parts = response.candidates[0].content.parts
+                if parts:
+                    return parts[0].text.strip()
 
-            return "Model returned an empty response."
+            return "Empty response from model."
 
         except Exception as e:
-            return f"LLM generation error: {str(e)}"
+            return f"LLM error: {str(e)}"

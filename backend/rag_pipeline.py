@@ -10,55 +10,52 @@ from llm_client import LlmClient
 from models import QueryLog, UserSettings
 from retrieval import RetrievalEngine
 from security.prompt_guard import sanitize_context
+from cache import get_cache, set_cache   # ✅ NEW
 
 
 def build_structured_prompt(context_text: str, query: str) -> str:
     return f"""
-You are an expert AI assistant.
+You are a highly skilled AI assistant.
 
-Your response MUST be:
-- visually structured
+Your response should feel like ChatGPT:
+- clear
+- well spaced
 - easy to scan
-- professionally formatted
+- professional, not textbook
 
-STRICT RULES:
+FORMAT RULES:
 
-1. Use emojis in ALL section headings
-2. Use short paragraphs (max 2 lines)
-3. NEVER write long paragraphs
-4. Use bullet points for clarity
-5. Add spacing between sections
-6. Make it visually appealing like ChatGPT
+- Use section headings with emojis
+- Keep paragraphs short (1–2 lines)
+- Add spacing between sections
+- Use bullet points where helpful
+- Avoid long dense text
+- Be conversational but precise
 
-REQUIRED FORMAT:
+STRUCTURE:
 
 ## 🚀 Answer
-Short, clear answer (3–4 lines max)
+Give a direct answer (concise)
 
 ## 🧠 Key Idea
-Explain simply
+Explain simply in 2–3 lines
 
 ## 🔍 Breakdown
-- Point 1
-- Point 2
-- Point 3
+- Key point 1
+- Key point 2
+- Key point 3
 
-## 📌 Example
-Short example
+## 📌 Example (if useful)
+Short practical example
 
 ## ⚡ Summary
-1–2 lines max
+1–2 line takeaway
 
 Context:
 {context_text}
 
 Question:
 {query}
-
-IMPORTANT:
-- Include emojis exactly as shown
-- Do NOT return plain text
-- Do NOT skip sections
 """
 
 
@@ -91,7 +88,17 @@ class RagPipeline:
         user_id: int,
         top_k: Optional[int] = None,
         document_ids: Optional[List[int]] = None,
+        temperature: float = 0.7,
+        model: str = "gemini",
+        retrieval_mode: str = "semantic"
     ):
+
+        # 🔥 CACHE KEY (SAFE)
+        cache_key = f"{user_id}:{query}:{retrieval_mode}"
+
+        cached = get_cache(cache_key)
+        if cached:
+            return ChatResponse(**cached)
 
         start = perf_counter()
 
@@ -104,7 +111,7 @@ class RagPipeline:
             user_id=user_id,
             top_k=effective_top_k,
             document_ids=document_ids,
-            mode=settings.retrieval_mode,
+            mode=retrieval_mode,
         )
 
         latency_ms = int((perf_counter() - start) * 1000)
@@ -137,8 +144,8 @@ class RagPipeline:
         answer = self.llm_client.generate(
             system_prompt="You are a structured AI assistant.",
             user_prompt=prompt,
-            temperature=float(settings.temperature),
-            model=settings.model,
+            temperature=temperature,
+            model=model,
         )
 
         citations: List[Citation] = []
@@ -172,6 +179,15 @@ class RagPipeline:
 
         final_answer = f"{answer}\n\n---\n**Confidence Score:** {round(avg_score, 2)}"
 
+        response = ChatResponse(
+            answer=final_answer,
+            citations=citations,
+            retrieved_chunks=retrieved_chunks
+        )
+
+        # 🔥 SAVE CACHE (FULL OBJECT)
+        set_cache(cache_key, response.dict())
+
         self._log_query(
             db,
             query,
@@ -182,11 +198,7 @@ class RagPipeline:
             len(answer),
         )
 
-        return ChatResponse(
-            answer=final_answer,
-            citations=citations,
-            retrieved_chunks=retrieved_chunks
-        )
+        return response
 
     # -----------------------------
     # STREAMING
@@ -198,12 +210,15 @@ class RagPipeline:
         user_id: int,
         top_k: Optional[int] = None,
         document_ids: Optional[List[int]] = None,
+        temperature: float = 0.7,
+        model: str = "gemini",
+        retrieval_mode: str = "semantic"
     ):
         import asyncio
         from services.llm_service import llm_stream_async
 
         settings = self._get_user_settings(db, user_id)
-        effective_top_k = top_k if top_k is not None else settings.top_k
+        effective_top_k = top_k if top_k is not None else settings.top_k or 3
 
         def run_retrieval():
             return self.retrieval_engine.search(
@@ -212,7 +227,7 @@ class RagPipeline:
                 user_id=user_id,
                 top_k=effective_top_k,
                 document_ids=document_ids,
-                mode=settings.retrieval_mode,
+                mode=retrieval_mode,
             )
 
         retrieved = await asyncio.to_thread(run_retrieval)
@@ -221,26 +236,21 @@ class RagPipeline:
             yield "No relevant information found."
             return
 
+        # 🔥 LIMIT CONTEXT SIZE (CRITICAL FIX)
         context_blocks = []
 
-        for i, r in enumerate(retrieved, start=1):
-            meta = r.chunk.meta or {}
-            page = meta.get("page")
-
-            source_label = r.document.filename
-            if page:
-                source_label += f" page {page}"
-
+        for i, r in enumerate(retrieved[:3], start=1):
+            text = r.chunk.text[:500]  # truncate large chunks
             context_blocks.append(
-                f"[{i}] {source_label} (chunk {r.chunk.chunk_index})\n{r.chunk.text}"
+                f"[{i}] {r.document.filename} (chunk {r.chunk.chunk_index})\n{text}"
             )
 
         context_text = sanitize_context("\n\n".join(context_blocks))
-
         prompt = build_structured_prompt(context_text, query)
 
-        async for token in llm_stream_async(prompt):
-            yield token
+        async for token in llm_stream_async(prompt, temperature):
+            if token:
+                yield token
 
     def _log_query(
         self,

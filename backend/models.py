@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import relationship
-
+from sqlalchemy import Column, Boolean
 from db import Base
 
 
@@ -163,6 +163,10 @@ class ChatSession(Base):
 
     title = Column(String, default="New Chat")
 
+    # 🔥 ADD THESE TWO FIELDS HERE
+    is_archived = Column(Boolean, default=False)
+    is_pinned = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship(
@@ -175,7 +179,6 @@ class ChatSession(Base):
         back_populates="session",
         cascade="all, delete-orphan",
     )
-
 
 class ChatMessage(Base):
     __tablename__ = "messages"

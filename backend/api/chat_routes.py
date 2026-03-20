@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import asyncio
+import time
 
 from db import get_db, engine
 from models import Base, ChatMessage, ChatSession, User
@@ -9,13 +10,23 @@ from core.auth_dependency import get_current_user
 from .schemas import ChatRequest
 from rag_pipeline import RagPipeline
 
-# ✅ MUST COME BEFORE ROUTES
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 @router.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+
+
+# 🔥 RETRY WRAPPER
+def retry_operation(fn, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            return fn()
+        except Exception as e:
+            if attempt == retries - 1:
+                raise e
+            time.sleep(delay * (attempt + 1))
 
 
 @router.post("/ask")
@@ -28,18 +39,15 @@ async def ask_chat(
     if not payload.query.strip():
         raise HTTPException(status_code=400, detail="Query must not be empty")
 
-    session = (
-        db.query(ChatSession)
-        .filter(
-            ChatSession.id == payload.session_id,
-            ChatSession.user_id == current_user.id,
-        )
-        .first()
-    )
+    session = db.query(ChatSession).filter(
+        ChatSession.id == payload.session_id,
+        ChatSession.user_id == current_user.id,
+    ).first()
 
     if not session:
         raise HTTPException(status_code=404, detail="Chat session not found")
 
+    # ✅ Save user message
     db.add(ChatMessage(
         session_id=payload.session_id,
         role="user",
@@ -55,38 +63,84 @@ async def ask_chat(
         full_answer = ""
 
         try:
-            # ✅ LOAD SETTINGS
             settings = pipeline._get_user_settings(db, current_user.id)
 
+            temperature = float(settings.temperature or 0.7)
+            model = settings.model or "gemini"
+            retrieval_mode = settings.retrieval_mode or "semantic"
+
+            # 🔥 STREAMING MODE
             if settings.streaming:
-                async for token in pipeline.stream_answer(
-                    db=db,
-                    query=payload.query,
-                    user_id=current_user.id,
-                    top_k=payload.top_k,
-                    document_ids=payload.document_ids,
-                ):
-                    full_answer += token
-                    yield f"data: {json.dumps({'token': token})}\n\n"
 
+                async def stream_fn():
+                    async for token in pipeline.stream_answer(
+                        db=db,
+                        query=payload.query,
+                        user_id=current_user.id,
+                        top_k=payload.top_k,
+                        document_ids=payload.document_ids,
+                        temperature=temperature,
+                        model=model,
+                        retrieval_mode=retrieval_mode
+                    ):
+                        return token  # handled below
+
+                try:
+                    async for token in pipeline.stream_answer(
+                        db=db,
+                        query=payload.query,
+                        user_id=current_user.id,
+                        top_k=payload.top_k,
+                        document_ids=payload.document_ids,
+                        temperature=temperature,
+                        model=model,
+                        retrieval_mode=retrieval_mode
+                    ):
+                        full_answer += token
+                        yield f"data: {json.dumps({'token': str(token)})}\n\n"
+
+                except Exception as e:
+                    # 🔥 QUOTA / FAILURE FALLBACK
+                    error_text = str(e)
+
+                    if "RESOURCE_EXHAUSTED" in error_text:
+                        fallback = "⚠️ Rate limit reached. Please try again in a few seconds."
+                    else:
+                        fallback = "⚠️ Something went wrong while generating response."
+
+                    for word in fallback.split(" "):
+                        yield f"data: {json.dumps({'token': word + ' '})}\n\n"
+                        await asyncio.sleep(0.05)
+
+                    full_answer = fallback
+
+            # 🔥 NON-STREAM MODE
             else:
-                response = await asyncio.to_thread(
-                    pipeline.answer_question,
-                    db,
-                    payload.query,
-                    current_user.id,
-                    payload.top_k,
-                    payload.document_ids,
-                )
+                try:
+                    response = await asyncio.to_thread(
+                        lambda: retry_operation(
+                            lambda: pipeline.answer_question(
+                                db,
+                                payload.query,
+                                current_user.id,
+                                payload.top_k,
+                                payload.document_ids,
+                                temperature,
+                                model,
+                                retrieval_mode
+                            )
+                        )
+                    )
 
-                full_answer = response.answer
+                    full_answer = response.answer
+                    yield f"data: {json.dumps({'full': full_answer})}\n\n"
 
-                yield f"data: {json.dumps({'full': full_answer})}\n\n"
+                except Exception:
+                    fallback = "⚠️ Unable to generate response right now."
+                    full_answer = fallback
+                    yield f"data: {json.dumps({'full': fallback})}\n\n"
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         finally:
