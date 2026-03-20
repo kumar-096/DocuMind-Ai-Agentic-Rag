@@ -11,7 +11,10 @@ from api.settings_routes import router as settings_router
 # IMPORTANT: ensure models are imported before create_all
 import models
 
-
+origins = [
+    "http://localhost:5173",
+    #"https://your-frontend.vercel.app"  # placeholder (we update later)
+]
 def create_app() -> FastAPI:
 
     configure_logging()
@@ -26,7 +29,7 @@ def create_app() -> FastAPI:
     
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
