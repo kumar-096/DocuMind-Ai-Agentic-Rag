@@ -9,6 +9,7 @@ from core.auth_dependency import get_current_user
 from .schemas import ChatRequest
 from rag_pipeline import RagPipeline
 
+# ✅ MUST COME BEFORE ROUTES
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
@@ -54,17 +55,33 @@ async def ask_chat(
         full_answer = ""
 
         try:
-            async for token in pipeline.stream_answer(
-                db=db,
-                query=payload.query,
-                user_id=current_user.id,
-                top_k=payload.top_k,
-                document_ids=payload.document_ids,
-            ):
-                full_answer += token
+            # ✅ LOAD SETTINGS
+            settings = pipeline._get_user_settings(db, current_user.id)
 
-                # ✅ SAFE JSON STREAM
-                yield f"data: {json.dumps({'token': token})}\n\n"
+            if settings.streaming:
+                async for token in pipeline.stream_answer(
+                    db=db,
+                    query=payload.query,
+                    user_id=current_user.id,
+                    top_k=payload.top_k,
+                    document_ids=payload.document_ids,
+                ):
+                    full_answer += token
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+
+            else:
+                response = await asyncio.to_thread(
+                    pipeline.answer_question,
+                    db,
+                    payload.query,
+                    current_user.id,
+                    payload.top_k,
+                    payload.document_ids,
+                )
+
+                full_answer = response.answer
+
+                yield f"data: {json.dumps({'full': full_answer})}\n\n"
 
         except Exception as e:
             import traceback

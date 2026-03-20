@@ -23,12 +23,10 @@ def generate_full(prompt: str) -> str:
 
 
 async def llm_stream_async(prompt: str):
-    # ✅ Step 1: get full response
+    # ✅ Get full response
     full_text = await asyncio.to_thread(generate_full, prompt)
 
-    # ✅ Step 2: simulate streaming
-    words = full_text.split()
-
-    for word in words:
-        yield word + " "
-        await asyncio.sleep(0.02)  # smooth typing effect
+    # 🔥 CRITICAL FIX: stream ch    aracters, NOT words
+    for char in full_text:
+        yield char
+        await asyncio.sleep(0.005)  # smoother + preserves formatting

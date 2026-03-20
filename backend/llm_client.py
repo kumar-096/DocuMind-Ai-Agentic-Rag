@@ -16,13 +16,16 @@ class LlmClient:
                 "GEMINI_API_KEY is missing. Add it to your .env file."
             )
 
-        # Initialize Gemini client
         self.client = genai.Client(api_key=settings.gemini_api_key)
+        self.default_model = model_name or settings.gemini_model
 
-        # Choose model
-        self.model_name = model_name or settings.gemini_model
-
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.7,
+        model: Optional[str] = None,
+    ) -> str:
 
         prompt = f"""{system_prompt}
 
@@ -30,16 +33,23 @@ User Question:
 {user_prompt}
 """
 
+        # ✅ model switching (basic)
+        model_name = self.default_model
+        if model == "gemini":
+            model_name = self.default_model
+
         try:
             response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
+                model=model_name,
+                contents=prompt,
+                config={
+                    "temperature": float(temperature)
+                }
             )
 
             if response and hasattr(response, "text") and response.text:
                 return response.text.strip()
 
-            # fallback parsing
             if response and hasattr(response, "candidates"):
                 candidates = response.candidates
                 if candidates:

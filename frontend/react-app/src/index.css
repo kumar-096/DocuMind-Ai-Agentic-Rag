@@ -1,1 +1,25 @@
 @import "tailwindcss";
+.prose h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-top: 1rem;
+  }
+  
+  .prose h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-top: 0.8rem;
+  }
+  
+  .prose p {
+    margin: 0.4rem 0;
+    line-height: 1.6;
+  }
+  
+  .prose ul {
+    margin-left: 1rem;
+  }
+  
+  .prose li {
+    margin: 0.3rem 0;
+  }

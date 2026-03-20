@@ -132,20 +132,23 @@ class QueryLog(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     query_text = Column(Text, nullable=False)
-
+    
     created_at = Column(DateTime, default=datetime.utcnow)
 
     latency_ms = Column(Integer, nullable=True)
 
     num_results = Column(Integer, nullable=True)
 
+    # 🔥 NEW FIELDS
+    retrieval_mode = Column(String, nullable=True)
+    model_used = Column(String, nullable=True)
+    temperature = Column(String, nullable=True)
+
+    response_length = Column(Integer, nullable=True)
+
     user_id = Column(Integer, ForeignKey("users.id"))
 
-    user = relationship(
-        "User",
-        back_populates="queries"
-    )
-
+    user = relationship("User", back_populates="queries")
 
 class ChatSession(Base):
     __tablename__ = "sessions"

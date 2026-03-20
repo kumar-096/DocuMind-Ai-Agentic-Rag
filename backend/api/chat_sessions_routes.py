@@ -10,12 +10,12 @@ from core.auth_dependency import get_current_user
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
+# ---------------- CREATE SESSION ----------------
 @router.post("/")
 def create_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
     session = ChatSession(
         user_id=current_user.id,
         title="New Chat"
@@ -25,19 +25,15 @@ def create_session(
     db.commit()
     db.refresh(session)
 
-    return {
-        "id": session.id,
-        "title": session.title,
-        "created_at": session.created_at
-    }
+    return session
 
 
+# ---------------- LIST SESSIONS ----------------
 @router.get("/")
 def list_sessions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
     sessions = (
         db.query(ChatSession)
         .filter(ChatSession.user_id == current_user.id)
@@ -45,23 +41,16 @@ def list_sessions(
         .all()
     )
 
-    return [
-        {
-            "id": s.id,
-            "title": s.title,
-            "created_at": s.created_at
-        }
-        for s in sessions
-    ]
+    return sessions
 
 
+# ---------------- GET MESSAGES ----------------
 @router.get("/{session_id}/messages")
 def get_messages(
     session_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
     session = (
         db.query(ChatSession)
         .filter(
@@ -76,21 +65,60 @@ def get_messages(
 
     messages = (
         db.query(ChatMessage)
-        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
-        .filter(
-            ChatMessage.session_id == session_id,
-            ChatSession.user_id == current_user.id
-        )
+        .filter(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.created_at.asc())
         .all()
     )
 
-    return [
-        {
-            "id": m.id,
-            "role": m.role,
-            "content": m.content,
-            "created_at": m.created_at
-        }
-        for m in messages
-    ]
+    return messages
+
+
+# ---------------- RENAME SESSION ----------------
+@router.put("/{session_id}")
+def rename_session(
+    session_id: int,
+    title: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = (
+        db.query(ChatSession)
+        .filter(
+            ChatSession.id == session_id,
+            ChatSession.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.title = title
+    db.commit()
+
+    return {"message": "updated"}
+
+
+# ---------------- DELETE SESSION ----------------
+@router.delete("/{session_id}")
+def delete_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = (
+        db.query(ChatSession)
+        .filter(
+            ChatSession.id == session_id,
+            ChatSession.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    db.delete(session)
+    db.commit()
+
+    return {"message": "deleted"}
