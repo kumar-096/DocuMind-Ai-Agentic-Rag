@@ -10,7 +10,7 @@ from core.auth_dependency import get_current_user
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-class RegisterRequest(BaseModel):
+class SignupRequest(BaseModel):
     email: EmailStr
     password: str
 
@@ -21,22 +21,18 @@ class LoginRequest(BaseModel):
 
 
 # -----------------------------
-# Register
+# SIGNUP (RENAMED + CLEANED)
 # -----------------------------
-@router.post("/register")
-def register(
-    payload: RegisterRequest,
+@router.post("/signup")
+def signup(
+    payload: SignupRequest,
     response: Response,
     db: Session = Depends(get_db)
 ):
-
     existing = db.query(User).filter(User.email == payload.email).first()
 
     if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
+        raise HTTPException(status_code=400, detail="User already exists")
 
     user = User(
         email=payload.email,
@@ -53,20 +49,20 @@ def register(
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,   # ⚠️ set True in production (HTTPS)
+        secure=False,  # ⚠️ True in production
         samesite="lax",
-        max_age=60 * 60 * 24  # 1 day
+        max_age=60 * 60 * 24
     )
 
     return {
-        "message": "User registered successfully",
+        "message": "User created successfully",
         "user_id": user.id,
         "email": user.email
     }
 
 
 # -----------------------------
-# Login
+# LOGIN
 # -----------------------------
 @router.post("/login")
 def login(
@@ -74,16 +70,9 @@ def login(
     response: Response,
     db: Session = Depends(get_db)
 ):
-
     user = db.query(User).filter(User.email == payload.email).first()
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
-        )
-
-    if not verify_password(payload.password, user.password_hash):
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -95,7 +84,7 @@ def login(
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,   # ⚠️ True in production
+        secure=False,
         samesite="lax",
         max_age=60 * 60 * 24
     )
@@ -108,26 +97,21 @@ def login(
 
 
 # -----------------------------
-# Logout
+# LOGOUT
 # -----------------------------
 @router.post("/logout")
 def logout(response: Response):
-
     response.delete_cookie("access_token")
-
-    return {
-        "message": "Logged out successfully"
-    }
+    return {"message": "Logged out successfully"}
 
 
 # -----------------------------
-# Current user
+# CURRENT USER
 # -----------------------------
 @router.get("/me")
 def get_current_user_endpoint(
     current_user: User = Depends(get_current_user)
 ):
-
     return {
         "id": current_user.id,
         "email": current_user.email

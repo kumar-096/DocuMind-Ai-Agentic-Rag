@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext"
 import { listSessions, createSession } from "../../lib/api"
 import type { ChatSession } from "../../lib/api"
 
-type Page = "chat" | "documents" | "settings" | "analytics"
+type Page = "chat" | "documents" | "settings"
 
 type SidebarProps = {
   page: Page
@@ -20,27 +20,23 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
   useEffect(() => {
 
-    const token = localStorage.getItem("access_token")
-  
-    if (!token) return
-  
     async function loadSessions() {
-  
+
       try {
-  
+
         const data = await listSessions()
         setSessions(data)
-  
+
       } catch (err) {
-  
-        console.error(err)
-  
+
+        console.error("Failed to load sessions", err)
+
       }
-  
+
     }
-  
+
     loadSessions()
-  
+
   }, [])
 
   async function handleNewChat() {
@@ -59,7 +55,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
     } catch (err) {
 
-      console.error(err)
+      console.error("Failed to create session", err)
 
     }
 
@@ -157,13 +153,6 @@ export function Sidebar({ page, setPage }: SidebarProps) {
           className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 cursor-pointer"
         >
           Settings
-        </button>
-
-        <button
-          onClick={() => setPage("analytics")}
-          className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 cursor-pointer"
-        >
-          Analytics
         </button>
 
       </nav>
