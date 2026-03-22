@@ -1,28 +1,40 @@
 fastapi==0.110.0
 uvicorn[standard]==0.27.1
 
+# DB
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 
+# Config
 pydantic==2.6.4
 pydantic-settings==2.2.1
+python-dotenv==1.0.1
 
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# File upload
 python-multipart==0.0.9
 
-# 🔴 CRITICAL FIX
+# 🔴 NUMPY FIX (CRITICAL)
 numpy==1.26.4
 
-# RAG / embeddings
+# ML / RAG
 sentence-transformers==2.6.1
 faiss-cpu==1.7.4
 
-# CPU torch
+# CPU torch (NO GPU DOWNLOADS)
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.2.2
 
-# File processing
+# File parsing
 pypdf==4.0.2
 docx2txt==0.8
 
 # LLM
 google-generativeai==0.5.4
+google-auth==2.29.0
+
+# Cache
+redis==5.0.4
