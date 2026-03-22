@@ -2,16 +2,23 @@ fastapi==0.110.0
 uvicorn[standard]==0.27.1
 
 sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
 
 pydantic==2.6.4
 pydantic-settings==2.2.1
 
 python-multipart==0.0.9
 
+# RAG / embeddings
 sentence-transformers==2.6.1
 faiss-cpu==1.7.4
 
+# Force CPU torch (prevents CUDA downloads)
+torch==2.2.2+cpu --index-url https://download.pytorch.org/whl/cpu
+
+# File processing
 pypdf==4.0.2
 docx2txt==0.8
 
+# LLM
 google-generativeai==0.5.4
