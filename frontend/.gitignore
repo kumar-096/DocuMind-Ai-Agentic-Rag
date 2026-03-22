@@ -25,3 +25,8 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+node_modules/
+temp/
+frontend/temp/
+backend/documents/
+*.index
