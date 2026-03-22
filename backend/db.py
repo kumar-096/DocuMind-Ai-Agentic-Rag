@@ -7,7 +7,7 @@ from settings import get_settings
 
 settings = get_settings()
 
-print("DATABASE connected:", settings.DATABASE_URL)
+print("DATABASE connected:")
 
 engine = create_engine(
     settings.DATABASE_URL,

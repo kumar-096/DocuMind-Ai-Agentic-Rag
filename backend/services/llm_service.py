@@ -1,41 +1,43 @@
-from google import genai
 import asyncio
 import time
-from settings import get_settings
+import google.generativeai as genai
 
+from settings import get_settings
+from llm_client import LlmClient
+
+
+# Load settings
 settings = get_settings()
 
-client = genai.Client(api_key=settings.gemini_api_key)
+# Validate API key early (fail fast)
+if not settings.gemini_api_key:
+    raise RuntimeError("GEMINI_API_KEY missing")
+
+# Configure Gemini once
+genai.configure(api_key=settings.gemini_api_key)
+
+# Single LLM instance (avoid duplicate logic)
+llm = LlmClient()
 
 
-# 🔥 SAFE GENERATE (WITH RETRY + QUOTA HANDLING)
-def safe_generate(prompt: str, temperature: float):
-
+# ----------------------------------------
+# SAFE GENERATE (RETRY + QUOTA HANDLING)
+# ----------------------------------------
+def safe_generate(prompt: str, temperature: float) -> str:
     MAX_RETRIES = 3
 
     for attempt in range(MAX_RETRIES):
         try:
-            response = client.models.generate_content(
-                model=settings.gemini_model,
-                contents=prompt,
-                config={"temperature": float(temperature)},
+            return llm.generate(
+                system_prompt="You are a helpful assistant.",
+                user_prompt=prompt,
+                temperature=temperature,
             )
 
-            if response and getattr(response, "text", None):
-                return response.text
-
-            if response and hasattr(response, "candidates"):
-                parts = response.candidates[0].content.parts
-                if parts:
-                    return parts[0].text
-
-            return ""
-
         except Exception as e:
-
             error_text = str(e)
 
-            # 🔥 HANDLE QUOTA
+            # Handle quota errors
             if "RESOURCE_EXHAUSTED" in error_text:
                 wait_time = 12 + attempt * 5
                 print(f"Quota hit. Retrying in {wait_time}s...")
@@ -47,19 +49,20 @@ def safe_generate(prompt: str, temperature: float):
     return "⚠️ Rate limit exceeded. Please try again later."
 
 
-# 🔥 IMPROVED STREAM FUNCTION (FAST + MARKDOWN SAFE)
-# 🔥 TRUE STREAMING (MARKDOWN SAFE + FAST)
-
+# ----------------------------------------
+# STREAMING (CHUNK-BASED)
+# ----------------------------------------
 async def llm_stream_async(prompt: str, temperature: float):
 
+    # Run blocking LLM call in background thread
     full_text = await asyncio.to_thread(safe_generate, prompt, temperature)
 
     if not full_text:
         yield "No response generated."
         return
 
-    # 🔥 SEND RAW TEXT IN CHUNKS (NO BREAKING)
-    chunk_size = 50  # adjust for speed
+    # Chunk size controls streaming speed
+    chunk_size = 50
 
     for i in range(0, len(full_text), chunk_size):
         yield full_text[i:i + chunk_size]

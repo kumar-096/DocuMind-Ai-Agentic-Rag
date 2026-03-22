@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     google_client_id: str
     # Gemini
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-1.5-flash"
 
     # Vector + storage
     vector_store_backend: str = "faiss"

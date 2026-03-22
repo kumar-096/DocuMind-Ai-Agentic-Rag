@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
-from google import genai
+import google.generativeai as genai
 
 from settings import get_settings
 
@@ -14,9 +14,10 @@ class LlmClient:
         if not settings.gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY missing")
 
-        self.client = genai.Client(api_key=settings.gemini_api_key)
-        self.gemini_model = settings.gemini_model
+        # ✅ Correct configuration
+        genai.configure(api_key=settings.gemini_api_key)
 
+        self.gemini_model = settings.gemini_model
     def generate(
         self,
         system_prompt: str,
@@ -40,10 +41,11 @@ User Question:
             model_name = self.gemini_model
 
         try:
-            response = self.client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config={
+            model_instance = genai.GenerativeModel(model_name)
+
+            response = model_instance.generate_content(
+                prompt,
+                generation_config={
                     "temperature": float(temperature)
                 }
             )
@@ -51,11 +53,10 @@ User Question:
             if response and getattr(response, "text", None):
                 return response.text.strip()
 
-            if response and hasattr(response, "candidates"):
-                parts = response.candidates[0].content.parts
-                if parts:
-                    return parts[0].text.strip()
+            if response and response.text:
+                return response.text.strip()
 
+            return "Empty response from model."
             return "Empty response from model."
 
         except Exception as e:
