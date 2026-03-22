@@ -13,8 +13,9 @@ python-multipart==0.0.9
 sentence-transformers==2.6.1
 faiss-cpu==1.7.4
 
-# Force CPU torch (prevents CUDA downloads)
-torch==2.2.2+cpu --index-url https://download.pytorch.org/whl/cpu
+# 🔴 FIXED TORCH INSTALL
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2
 
 # File processing
 pypdf==4.0.2
