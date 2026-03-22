@@ -9,11 +9,14 @@ pydantic-settings==2.2.1
 
 python-multipart==0.0.9
 
+# 🔴 CRITICAL FIX
+numpy==1.26.4
+
 # RAG / embeddings
 sentence-transformers==2.6.1
 faiss-cpu==1.7.4
 
-# 🔴 FIXED TORCH INSTALL
+# CPU torch
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.2.2
 
