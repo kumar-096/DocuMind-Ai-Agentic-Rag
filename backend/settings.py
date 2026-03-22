@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     storage_backend: str = "local"
 
     # Database
-    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/rag_agent"
+    DATABASE_URL: str
 
     class Config:
         env_file = ".env"

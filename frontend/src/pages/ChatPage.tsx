@@ -46,32 +46,43 @@ export function ChatPage() {
   useEffect(() => {
 
     if (!sessionId) return
-
+  
     let cancelled = false
-
+  
     async function loadMessages() {
       try {
-
+  
         const stored = await loadSessionMessages(sessionId)
         if (cancelled) return
-
+  
         setMessages(stored.map(m => ({
           id: String(m.id),
           role: m.role,
           content: m.content
         })))
-
-      } catch {
-        const newSession = await createSession()
-        if (!cancelled) setSessionId(newSession.id)
+  
+      } catch (err: any) {
+  
+        if (err.message === "SESSION_NOT_FOUND") {
+  
+          const newSession = await createSession()
+  
+          if (!cancelled) {
+            setSessionId(newSession.id)
+            setMessages([]) // reset UI
+          }
+  
+          return
+        }
+  
+        console.error("Load messages error:", err)
       }
     }
-
+  
     loadMessages()
     return () => { cancelled = true }
-
+  
   }, [sessionId])
-
   /* ---------------- AUTO SCROLL ---------------- */
   useEffect(() => {
     const el = messagesEndRef.current
@@ -159,7 +170,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: lastUserMessage,
-        session_id: sessionId!,
+        session_id: sessionId || 0,
         top_k: settings?.top_k || 5
       },
       (token) => {
@@ -180,7 +191,15 @@ export function ChatPage() {
 
     e.preventDefault()
 
-    if (!input.trim() || loading || !sessionId) return
+    if (!input.trim() || loading) return
+
+    let activeSessionId = sessionId
+
+    if (!activeSessionId) {
+      const newSession = await createSession()
+      setSessionId(newSession.id)
+      activeSessionId = newSession.id
+    }
 
     setError(null)
 
@@ -208,7 +227,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: userMessage.content,
-        session_id: sessionId,
+        session_id: activeSessionId,
         top_k: settings?.top_k || 5
       },
       (token) => {

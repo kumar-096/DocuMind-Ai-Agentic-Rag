@@ -26,24 +26,22 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # -----------------------------
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
 
+    IS_PROD = settings.environment == "production"
+
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
-        samesite="none",
-        max_age=60 * 15
+        secure=IS_PROD,
+        samesite="none" if IS_PROD else "lax",
     )
-
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
-        samesite="none",
-        max_age=60 * 60 * 24 * 7
+        secure=IS_PROD,
+        samesite="none" if IS_PROD else "lax",
     )
-
     csrf_token = secrets.token_urlsafe(32)
 
     response.set_cookie(
@@ -243,3 +241,65 @@ def google_login(payload: GoogleAuthRequest, request: Request, response: Respons
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)):
     return {"id": current_user.id, "email": current_user.email}
+from datetime import datetime
+from fastapi import Cookie
+
+
+@router.post("/refresh")
+def refresh_token(
+    response: Response,
+    db: Session = Depends(get_db),
+    refresh_token: str = Cookie(default=None)
+):
+
+    if not refresh_token:
+        raise HTTPException(401, "Missing refresh token")
+
+    try:
+        payload = decode_token(refresh_token)
+        user_id = int(payload.get("sub"))
+        token_version = payload.get("token_version")
+
+    except Exception:
+        raise HTTPException(401, "Invalid refresh token")
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(401, "User not found")
+
+    # 🔥 TOKEN VERSION CHECK
+    if token_version != user.token_version:
+        raise HTTPException(401, "Token expired")
+
+    # 🔥 CHECK SESSION EXISTS
+    hashed = hash_token(refresh_token)
+
+    session = db.query(UserSession).filter(
+        UserSession.user_id == user.id,
+        UserSession.refresh_token_hash == hashed,
+        UserSession.is_active == True
+    ).first()
+
+    if not session:
+        raise HTTPException(401, "Session invalid")
+
+    # 🔥 ROTATE TOKENS (VERY IMPORTANT)
+    new_access = create_access_token({
+        "sub": str(user.id),
+        "token_version": user.token_version
+    })
+
+    new_refresh = create_refresh_token({
+        "sub": str(user.id),
+        "token_version": user.token_version
+    })
+
+    # update session
+    session.refresh_token_hash = hash_token(new_refresh)
+    session.last_used_at = datetime.utcnow()
+    db.commit()
+
+    set_auth_cookies(response, new_access, new_refresh)
+
+    return {"message": "refreshed"}

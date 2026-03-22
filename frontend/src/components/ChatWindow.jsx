@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   listSessions,
   createSession,
@@ -8,26 +8,36 @@ import {
   getSettings
 } from "../lib/api";
 
-/* ---------------- MESSAGE ---------------- */
+/* ---------------- TYPING CURSOR ---------------- */
+function Cursor() {
+  return <span className="animate-pulse ml-1">|</span>;
+}
 
-function ChatMessage({ role, content }) {
+/* ---------------- MESSAGE ---------------- */
+function ChatMessage({ role, content, streaming }) {
   const isUser = role === "user";
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-3`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} px-2`}>
       <div
-        className={`max-w-2xl p-4 rounded-2xl ${
-          isUser ? "bg-blue-600 text-white" : "bg-[#1e1e1e] text-gray-100"
-        }`}
+        className={`
+          max-w-2xl px-5 py-3 rounded-2xl text-sm leading-relaxed
+          backdrop-blur-md border transition-all duration-200
+          ${
+            isUser
+              ? "bg-blue-600/90 text-white border-blue-500/30"
+              : "bg-white/5 text-gray-200 border-white/10"
+          }
+        `}
       >
         {content}
+        {streaming && <Cursor />}
       </div>
     </div>
   );
 }
 
 /* ---------------- MAIN ---------------- */
-
 function ChatWindow() {
   const [sessions, setSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
@@ -35,34 +45,38 @@ function ChatWindow() {
 
   const [input, setInput] = useState("");
   const [streamingText, setStreamingText] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const [settings, setSettings] = useState(null);
 
-  /* ---------------- LOAD SETTINGS ---------------- */
+  const bottomRef = useRef(null);
+
+  /* ---------------- AUTO SCROLL ---------------- */
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingText]);
+
+  /* ---------------- SETTINGS ---------------- */
   useEffect(() => {
     getSettings().then(setSettings).catch(console.error);
   }, []);
 
-  /* ---------------- LOAD SESSIONS ---------------- */
+  /* ---------------- LOAD ---------------- */
   const loadSessions = async () => {
-    try {
-      const data = await listSessions();
-      setSessions(data);
-
-      if (data.length > 0) {
-        setActiveSession(data[0]);
-      }
-    } catch (err) {
-      console.error("Session load error:", err);
-    }
+    const data = await listSessions();
+    setSessions(data);
+    if (data.length > 0) setActiveSession(data[0]);
   };
 
-  /* ---------------- LOAD MESSAGES ---------------- */
-  const loadMessages = async (sessionId) => {
+  const loadMessages = async (id) => {
     try {
-      const data = await loadSessionMessages(sessionId);
+      setLoading(true);
+      const data = await loadSessionMessages(id);
       setMessages(data);
-    } catch (err) {
-      console.error("Message load error:", err);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,155 +85,188 @@ function ChatWindow() {
   }, []);
 
   useEffect(() => {
-    if (activeSession) {
-      loadMessages(activeSession.id);
-    }
+    if (activeSession) loadMessages(activeSession.id);
   }, [activeSession]);
 
-  /* ---------------- CREATE CHAT ---------------- */
+  /* ---------------- ACTIONS ---------------- */
   const createChat = async () => {
-    try {
-      const newSession = await createSession();
-      setSessions((prev) => [newSession, ...prev]);
-      setActiveSession(newSession);
-      setMessages([]);
-    } catch (err) {
-      console.error(err);
-    }
+    const s = await createSession();
+    setSessions((prev) => [s, ...prev]);
+    setActiveSession(s);
+    setMessages([]);
   };
 
-  /* ---------------- DELETE CHAT ---------------- */
   const deleteChat = async (id) => {
-    try {
-      await deleteSession(id);
-
-      const updated = sessions.filter((s) => s.id !== id);
-      setSessions(updated);
-
-      if (updated.length > 0) {
-        setActiveSession(updated[0]);
-      } else {
-        setMessages([]);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    await deleteSession(id);
+    const updated = sessions.filter((s) => s.id !== id);
+    setSessions(updated);
+    setActiveSession(updated[0] || null);
   };
 
-  /* ---------------- RENAME CHAT ---------------- */
   const renameChat = async (id) => {
-    const title = prompt("Enter new title:");
+    const title = prompt("Rename chat:");
     if (!title) return;
 
-    try {
-      await fetch(`/api/sessions/${id}?title=${title}`, {
-        method: "PUT",
-        credentials: "include",
-      });
+    await fetch(`/api/sessions/${id}?title=${title}`, {
+      method: "PUT",
+      credentials: "include",
+    });
 
-      loadSessions();
-    } catch (err) {
-      console.error(err);
-    }
+    loadSessions();
   };
 
-  /* ---------------- SEND MESSAGE ---------------- */
+  /* ---------------- SEND ---------------- */
   const sendMessage = async () => {
     if (!input.trim() || !activeSession) return;
 
-    const userMessage = input;
-
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: userMessage },
-    ]);
-
+    const userText = input;
     setInput("");
 
-    let fullText = "";
+    setMessages((prev) => [...prev, { role: "user", content: userText }]);
+
+    let full = "";
 
     askQuestionSSE(
       {
-        query: userMessage,
+        query: userText,
         session_id: activeSession.id,
-        top_k: settings?.top_k || 5
+        top_k: settings?.top_k || 5,
       },
       (token) => {
-        fullText += token;
+        full += token;
 
-        setStreamingText(fullText);
+        // smoother streaming (slight delay)
+        setTimeout(() => {
+          setStreamingText(full);
+        }, 10);
       },
       () => {
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: fullText },
+          { role: "assistant", content: full },
         ]);
-
         setStreamingText("");
       },
-      (err) => {
-        console.error("Streaming error:", err);
-      }
+      (err) => console.error(err)
     );
   };
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="flex h-screen bg-gradient-to-br from-black via-[#0a0a0a] to-[#050505] text-gray-200">
 
       {/* SIDEBAR */}
-      <div className="w-64 bg-[#111] p-4 border-r border-gray-800">
-        <button
-          onClick={createChat}
-          className="w-full mb-4 bg-blue-600 p-2 rounded"
-        >
-          + New Chat
-        </button>
+      <div className="w-64 flex flex-col border-r border-white/10 bg-black/40 backdrop-blur-xl">
 
-        {sessions.map((s) => (
-          <div
-            key={s.id}
-            className={`p-2 mb-2 rounded cursor-pointer ${
-              activeSession?.id === s.id ? "bg-[#222]" : ""
-            }`}
-            onClick={() => setActiveSession(s)}
+        {/* BRAND */}
+        <div className="py-6 flex flex-col items-center border-b border-white/10">
+          <div className="text-2xl mb-1">🧠</div>
+          <div className="text-lg font-semibold tracking-wide">
+            DocuMind <span className="text-blue-400 text-sm">AI</span>
+          </div>
+        </div>
+
+        {/* NEW CHAT */}
+        <div className="p-4">
+          <button
+            onClick={createChat}
+            className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition cursor-pointer text-sm"
           >
-            <div className="flex justify-between items-center">
-              <span>{s.title}</span>
+            + New Chat
+          </button>
+        </div>
 
-              <div className="flex gap-2 text-xs">
-                <button onClick={() => renameChat(s.id)}>✏️</button>
-                <button onClick={() => deleteChat(s.id)}>🗑</button>
+        {/* SESSIONS */}
+        <div className="flex-1 overflow-y-auto px-2 space-y-1">
+          {sessions.map((s) => (
+            <div
+              key={s.id}
+              onClick={() => setActiveSession(s)}
+              className={`
+                group px-3 py-2 rounded-lg cursor-pointer flex justify-between items-center
+                ${
+                  activeSession?.id === s.id
+                    ? "bg-white/10"
+                    : "hover:bg-white/5"
+                }
+              `}
+            >
+              <span className="truncate text-sm">{s.title}</span>
+
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    renameChat(s.id);
+                  }}
+                  className="cursor-pointer hover:scale-110"
+                >
+                  ✏️
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteChat(s.id);
+                  }}
+                  className="cursor-pointer hover:scale-110"
+                >
+                  🗑
+                </button>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* MAIN */}
       <div className="flex flex-col flex-1">
 
-        {/* CHAT */}
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-700">
-          {messages.map((msg, i) => (
-            <ChatMessage key={i} role={msg.role} content={msg.content} />
+        {/* HEADER */}
+        <div className="h-14 border-b border-white/10 flex items-center justify-center text-sm text-gray-400">
+          AI Assistant
+        </div>
+
+        {/* CHAT AREA */}
+        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
+
+          {/* 🔥 EMPTY STATE */}
+          {messages.length === 0 && !loading && (
+            <div className="text-center text-gray-500 mt-20">
+              <div className="text-3xl mb-3">💬</div>
+              <p className="text-sm">Start a conversation with your documents</p>
+            </div>
+          )}
+
+          {/* 🔥 LOADING STATE */}
+          {loading && (
+            <div className="text-center text-gray-400 text-sm">
+              Loading messages...
+            </div>
+          )}
+
+          {messages.map((m, i) => (
+            <ChatMessage key={i} role={m.role} content={m.content} />
           ))}
 
           {streamingText && (
-            <ChatMessage role="assistant" content={streamingText} />
+            <ChatMessage role="assistant" content={streamingText} streaming />
           )}
+
+          <div ref={bottomRef} />
         </div>
 
         {/* INPUT */}
-        <div className="sticky bottom-0 p-4 border-t border-gray-800 flex gap-2 bg-black">
+        <div className="p-4 border-t border-white/10 bg-black/40 backdrop-blur-xl flex gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="flex-1 p-3 rounded bg-[#1e1e1e] text-white"
+            placeholder="Ask something..."
+            className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-blue-500"
           />
 
           <button
             onClick={sendMessage}
-            className="bg-blue-600 px-4 py-2 rounded"
+            className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 transition cursor-pointer text-sm"
           >
             Send
           </button>

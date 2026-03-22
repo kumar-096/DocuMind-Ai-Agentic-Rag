@@ -326,8 +326,19 @@ export async function listSessions(): Promise<ChatSession[]> {
 }
 
 export async function loadSessionMessages(sessionId: number): Promise<StoredMessage[]> {
-  const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/${sessionId}/messages`)
-  if (!res.ok) throw new Error("Failed to load messages")
+
+  const res = await fetchWithTimeout(
+    `${BASE_URL}/api/sessions/${sessionId}/messages`
+  )
+
+  if (res.status === 404) {
+    throw new Error("SESSION_NOT_FOUND")
+  }
+
+  if (!res.ok) {
+    throw new Error("Failed to load messages")
+  }
+
   return res.json()
 }
 

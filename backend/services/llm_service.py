@@ -42,13 +42,14 @@ def safe_generate(prompt: str, temperature: float):
                 time.sleep(wait_time)
                 continue
 
-            # 🔥 OTHER ERRORS → BREAK
             return f"LLM error: {error_text}"
 
     return "⚠️ Rate limit exceeded. Please try again later."
 
 
-# 🔥 STREAM FUNCTION
+# 🔥 IMPROVED STREAM FUNCTION (FAST + MARKDOWN SAFE)
+# 🔥 TRUE STREAMING (MARKDOWN SAFE + FAST)
+
 async def llm_stream_async(prompt: str, temperature: float):
 
     full_text = await asyncio.to_thread(safe_generate, prompt, temperature)
@@ -57,19 +58,9 @@ async def llm_stream_async(prompt: str, temperature: float):
         yield "No response generated."
         return
 
-    # 🔥 SMART STREAMING (WORD + NATURAL DELAY)
-    words = full_text.split(" ")
+    # 🔥 SEND RAW TEXT IN CHUNKS (NO BREAKING)
+    chunk_size = 50  # adjust for speed
 
-    for word in words:
-
-        yield word + " "
-
-        # dynamic delay
-        delay = 0.01
-
-        if word.endswith(".") or word.endswith(","):
-            delay = 0.06
-        elif len(word) > 6:
-            delay = 0.02
-
-        await asyncio.sleep(delay)
+    for i in range(0, len(full_text), chunk_size):
+        yield full_text[i:i + chunk_size]
+        await asyncio.sleep(0.01)

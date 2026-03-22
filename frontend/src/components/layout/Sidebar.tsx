@@ -34,7 +34,6 @@ export function Sidebar({ page, setPage }: SidebarProps) {
   /* ---------------- LOAD SESSIONS ---------------- */
   async function loadSessions(searchQuery = "") {
     try {
-
       const res = await fetchWithAuth(
         `${BASE_URL}/api/sessions/?search=${searchQuery}&include_archived=${showArchived}`
       )
@@ -70,7 +69,6 @@ export function Sidebar({ page, setPage }: SidebarProps) {
   /* ---------------- CREATE SESSION ---------------- */
   async function handleNewChat() {
     try {
-
       const res = await fetchWithAuth(`${BASE_URL}/api/sessions/`, {
         method: "POST"
       })
@@ -191,8 +189,10 @@ export function Sidebar({ page, setPage }: SidebarProps) {
       />
 
       {/* HEADER */}
-      <div className="px-5 py-5 border-b border-slate-800">
-        <h2 className="text-md font-semibold text-white">Agentic RAG</h2>
+      <div className="mb-6 flex items-center justify-center gap-2 text-white text-lg font-semibold tracking-wide">
+        <span className="text-xl">🧠</span>
+        <span>DocuMind</span>
+        <span className="text-blue-400 text-sm">AI</span>
       </div>
 
       {/* SEARCH */}
@@ -209,7 +209,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
       <div className="px-3 pb-2">
         <button
           onClick={() => setShowArchived(!showArchived)}
-          className="text-xs text-slate-400 hover:text-white transition"
+          className="text-xs text-slate-400 hover:text-white transition cursor-pointer"
         >
           {showArchived ? "← Back to Chats" : "View Archived"}
         </button>
@@ -219,7 +219,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
       <div className="px-3 pb-2">
         <button
           onClick={handleNewChat}
-          className="w-full bg-blue-600 py-2 rounded text-sm hover:bg-blue-500 transition"
+          className="w-full bg-blue-600 py-2 rounded text-sm hover:bg-blue-500 transition cursor-pointer"
         >
           + New Chat
         </button>
@@ -232,7 +232,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
           <div
             key={s.id}
-            className="group relative flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 transition"
+            className="group relative flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 transition cursor-pointer"
           >
 
             <div
@@ -240,7 +240,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
                 setSessionId(s.id)
                 setPage("chat")
               }}
-              className="truncate text-xs text-slate-300 flex-1"
+              className="truncate text-xs text-slate-300 flex-1 cursor-pointer"
             >
               {s.title}
             </div>
@@ -248,7 +248,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
             {/* PIN */}
             <button
               onClick={() => togglePin(s.id)}
-              className="text-yellow-400 text-xs mr-1"
+              className="text-yellow-400 text-xs mr-1 cursor-pointer"
             >
               {s.is_pinned ? "★" : "☆"}
             </button>
@@ -256,7 +256,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
             {/* MENU */}
             <div
               onClick={() => setMenuOpen(menuOpen === s.id ? null : s.id)}
-              className="opacity-0 group-hover:opacity-100"
+              className="opacity-0 group-hover:opacity-100 cursor-pointer"
             >
               ⋮
             </div>
@@ -270,7 +270,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
                     setRenameId(s.id)
                     setMenuOpen(null)
                   }}
-                  className="block w-full text-left px-3 py-2 text-xs hover:bg-slate-800"
+                  className="block w-full text-left px-3 py-2 text-xs hover:bg-slate-800 cursor-pointer"
                 >
                   Rename
                 </button>
@@ -281,7 +281,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
                       handleArchive(s.id)
                       setMenuOpen(null)
                     }}
-                    className="block w-full text-left px-3 py-2 text-xs hover:bg-slate-800"
+                    className="block w-full text-left px-3 py-2 text-xs hover:bg-slate-800 cursor-pointer"
                   >
                     Archive
                   </button>
@@ -292,7 +292,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
                     setDeleteId(s.id)
                     setMenuOpen(null)
                   }}
-                  className="block w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-slate-800"
+                  className="block w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-slate-800 cursor-pointer"
                 >
                   Delete
                 </button>
@@ -321,21 +321,21 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
         <button
           onClick={() => setPage("documents")}
-          className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition"
+          className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer"
         >
           Documents
         </button>
 
         <button
           onClick={() => setPage("settings")}
-          className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition"
+          className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer"
         >
           Settings
         </button>
 
       </nav>
 
-      {/* 🔥 FIXED LOGOUT SECTION */}
+      {/* LOGOUT */}
       <div className="mt-auto">
 
         <div className="border-t border-slate-700"></div>
@@ -343,7 +343,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
         <div className="p-4">
           <button
             onClick={() => setShowLogoutModal(true)}
-            className="w-full text-left text-sm text-slate-300 hover:text-red-400 transition"
+            className="w-full text-left text-sm text-slate-300 hover:text-red-400 transition cursor-pointer"
           >
             Logout
           </button>
