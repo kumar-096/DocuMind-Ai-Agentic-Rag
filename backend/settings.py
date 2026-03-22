@@ -6,8 +6,8 @@ from pydantic import Field
 class Settings(BaseSettings):
 
     app_name: str = "Agentic RAG Backend"
-    environment: str = "development"
-    debug: bool = True
+    environment: str = "production"
+    debug: bool = False
 
     cors_allow_origins: list[str] = Field(
         default_factory=lambda: [
