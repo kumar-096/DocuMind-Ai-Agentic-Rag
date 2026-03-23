@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { GoogleLogin } from "@react-oauth/google"
-
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 export function LoginPage() {
 
   const [email, setEmail] = useState("")
@@ -73,8 +74,8 @@ export function LoginPage() {
     try {
 
       const endpoint = isSignup
-        ? "http://localhost:8000/api/auth/signup"
-        : "http://localhost:8000/api/auth/login"
+        ? `${BASE_URL}/api/auth/signup`
+        : `${BASE_URL}/api/auth/login`
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -110,7 +111,7 @@ export function LoginPage() {
 
     try {
       const res = await fetch(
-        "http://localhost:8000/api/auth/google",
+        `${BASE_URL}/api/auth/google`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
