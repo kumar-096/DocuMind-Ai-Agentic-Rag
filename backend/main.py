@@ -13,7 +13,7 @@ import models
 
 origins = [
     "http://localhost:5173",
-    #"https://your-frontend.vercel.app"  # placeholder (we update later)
+    "https://documind-ai-five.vercel.app"  # placeholder (we update later)
 ]
 def create_app() -> FastAPI:
 

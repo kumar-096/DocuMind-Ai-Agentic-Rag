@@ -26,22 +26,23 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # -----------------------------
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
 
-    IS_PROD = settings.environment == "production"
-
+    
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=IS_PROD,
-        samesite="none" if IS_PROD else "lax",
+        secure=True,
+        samesite="none",
     )
+
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=IS_PROD,
-        samesite="none" if IS_PROD else "lax",
+        secure=True,
+        samesite="none",
     )
+
     csrf_token = secrets.token_urlsafe(32)
 
     response.set_cookie(
@@ -51,7 +52,6 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         secure=True,
         samesite="none"
     )
-
 # -----------------------------
 # SCHEMAS
 # -----------------------------
