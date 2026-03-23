@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
-import google.generativeai as genai
+from google import genai
 
 from settings import get_settings
 
@@ -33,21 +33,20 @@ class LlmClient:
     """
 
         try:
-            #   Use stable model name supported in current SDK
-            model_instance = genai.GenerativeModel("gemini-1.0-pro")
+            client = genai.Client(api_key=get_settings().gemini_api_key)
 
-            response = model_instance.generate_content(
-                prompt,
-                generation_config={
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",  
+                contents=prompt,
+                config={
                     "temperature": float(temperature)
                 }
             )
 
-            #   SAFE extraction (important)
-            if response and hasattr(response, "text") and response.text:
+            if response and response.text:
                 return response.text.strip()
 
             return "Empty response from model."
 
         except Exception as e:
-            return f"LLM error: {str(e)}"
+            return f"LLM error: {str(e)}"   

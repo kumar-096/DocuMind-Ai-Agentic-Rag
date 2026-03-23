@@ -1,6 +1,6 @@
 import asyncio
 import time
-import google.generativeai as genai
+
 
 from settings import get_settings
 from llm_client import LlmClient
@@ -13,8 +13,7 @@ settings = get_settings()
 if not settings.gemini_api_key:
     raise RuntimeError("GEMINI_API_KEY missing")
 
-# Configure Gemini once
-genai.configure(api_key=settings.gemini_api_key)
+
 
 # Single LLM instance (avoid duplicate logic)
 llm = LlmClient()
