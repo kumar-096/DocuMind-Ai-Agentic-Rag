@@ -37,10 +37,10 @@ def list_sessions(
 ):
     q = db.query(ChatSession).filter(ChatSession.user_id == current_user.id)
 
-    # 🔥 filter archived
+    #   filter archived
     q = q.filter(ChatSession.is_archived == False)
 
-    # 🔥 search
+    #   search
     if search:
         q = q.filter(ChatSession.title.ilike(f"%{search}%"))
 

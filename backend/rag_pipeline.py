@@ -10,7 +10,7 @@ from llm_client import LlmClient
 from models import QueryLog, UserSettings
 from retrieval import RetrievalEngine
 from security.prompt_guard import sanitize_context
-from cache import get_cache, set_cache   # ✅ NEW
+from cache import get_cache, set_cache   #    NEW
 
 
 def build_structured_prompt(context_text: str, query: str) -> str:
@@ -93,7 +93,7 @@ class RagPipeline:
         retrieval_mode: str = "semantic"
     ):
 
-        # 🔥 CACHE KEY (SAFE)
+        #   CACHE KEY (SAFE)
         cache_key = f"{user_id}:{query}:{retrieval_mode}"
 
         cached = get_cache(cache_key)
@@ -185,7 +185,7 @@ class RagPipeline:
             retrieved_chunks=retrieved_chunks
         )
 
-        # 🔥 SAVE CACHE (FULL OBJECT)
+        #   SAVE CACHE (FULL OBJECT)
         set_cache(cache_key, response.dict())
 
         self._log_query(
@@ -236,7 +236,7 @@ class RagPipeline:
             yield "No relevant information found."
             return
 
-        # 🔥 LIMIT CONTEXT SIZE (CRITICAL FIX)
+        #   LIMIT CONTEXT SIZE (CRITICAL FIX)
         context_blocks = []
 
         for i, r in enumerate(retrieved[:3], start=1):

@@ -49,7 +49,7 @@ def get_current_user(
             detail="User not found",
         )
 
-    # 🔥 CRITICAL: token invalidation check
+    #   CRITICAL: token invalidation check
     if token_version != user.token_version:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

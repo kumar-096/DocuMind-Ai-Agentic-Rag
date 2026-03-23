@@ -21,9 +21,7 @@ from settings import get_settings
 settings = get_settings()
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# -----------------------------
-# COOKIE SETTER
-# -----------------------------
+
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
 
     
@@ -52,9 +50,7 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         secure=True,
         samesite="none"
     )
-# -----------------------------
-# SCHEMAS
-# -----------------------------
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -69,9 +65,7 @@ class GoogleAuthRequest(BaseModel):
     token: str
 
 
-# -----------------------------
-# LOGIN
-# -----------------------------
+
 @router.post("/login")
 def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
 
@@ -90,7 +84,7 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         reason = "user_not_found"
 
     elif user.password_hash is None:
-        # 🔥 CRITICAL FIX
+       
         raise HTTPException(400, "Use Google login")
 
     elif not verify_password(payload.password, user.password_hash):
@@ -137,9 +131,7 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
     return {"message": "Login successful"}
 
 
-# -----------------------------
-# SIGNUP
-# -----------------------------
+
 @router.post("/signup")
 def signup(payload: SignupRequest, request: Request, response: Response, db: Session = Depends(get_db)):
 
@@ -186,9 +178,7 @@ def signup(payload: SignupRequest, request: Request, response: Response, db: Ses
     return {"message": "Signup successful"}
 
 
-# -----------------------------
-# GOOGLE LOGIN
-# -----------------------------
+
 @router.post("/google")
 def google_login(payload: GoogleAuthRequest, request: Request, response: Response, db: Session = Depends(get_db)):
 
@@ -235,9 +225,6 @@ def google_login(payload: GoogleAuthRequest, request: Request, response: Respons
     return {"message": "Google login successful"}
 
 
-# -----------------------------
-# ME
-# -----------------------------
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)):
     return {"id": current_user.id, "email": current_user.email}
@@ -268,11 +255,11 @@ def refresh_token(
     if not user:
         raise HTTPException(401, "User not found")
 
-    # 🔥 TOKEN VERSION CHECK
+    
     if token_version != user.token_version:
         raise HTTPException(401, "Token expired")
 
-    # 🔥 CHECK SESSION EXISTS
+    
     hashed = hash_token(refresh_token)
 
     session = db.query(UserSession).filter(
@@ -284,7 +271,7 @@ def refresh_token(
     if not session:
         raise HTTPException(401, "Session invalid")
 
-    # 🔥 ROTATE TOKENS (VERY IMPORTANT)
+    #   ROTATE TOKENS (VERY IMPORTANT)
     new_access = create_access_token({
         "sub": str(user.id),
         "token_version": user.token_version

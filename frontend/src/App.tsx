@@ -6,7 +6,7 @@ import SettingsPage from "./pages/SettingsPage"
 
 import { useAuth } from "./context/AuthContext"
 import { SourceProvider } from "./context/SourceContext"
-import { ToastProvider } from "./context/ToastContext"   // ✅ NEW
+import { ToastProvider } from "./context/ToastContext"   //    NEW
 
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -63,7 +63,7 @@ function App() {
 
   return (
     <SourceProvider>
-      <ToastProvider> {/* ✅ GLOBAL TOAST SYSTEM */}
+      <ToastProvider> {/*    GLOBAL TOAST SYSTEM */}
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>

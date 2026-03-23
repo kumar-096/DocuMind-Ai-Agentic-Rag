@@ -231,7 +231,7 @@ export function askQuestionSSE(
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "X-CSRF-Token": getCSRFToken() // ✅ FIX
+      "X-CSRF-Token": getCSRFToken() //    FIX
     },
     body: JSON.stringify(payload),
     signal: controller.signal
@@ -241,7 +241,7 @@ export function askQuestionSSE(
       if (res.status === 401) {
 
         const refreshRes = await fetch(
-          `${BASE_URL}/api/auth/refresh`, // ✅ FIX
+          `${BASE_URL}/api/auth/refresh`, //    FIX
           {
             method: "POST",
             credentials: "include"
@@ -368,7 +368,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   if (res.status === 401) {
 
     const refreshRes = await fetch(
-      `${BASE_URL}/api/auth/refresh`, // ✅ FIX
+      `${BASE_URL}/api/auth/refresh`, //    FIX
       {
         method: "POST",
         credentials: "include"

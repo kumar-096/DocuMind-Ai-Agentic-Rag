@@ -21,19 +21,19 @@ Technically-minded people who want to build production RAG systems using AI codi
 ## Scope
 
 ### In Scope
-- ✅ Document ingestion and processing
-- ✅ Vector search with pgvector
-- ✅ Hybrid search (keyword + vector)
-- ✅ Reranking
-- ✅ Metadata extraction
-- ✅ Record management (deduplication)
-- ✅ Multi-format support (PDF, DOCX, HTML, Markdown)
-- ✅ Text-to-SQL tool
-- ✅ Web search fallback
-- ✅ Sub-agents with isolated context
-- ✅ Chat with threads and memory
-- ✅ Streaming responses
-- ✅ Auth with RLS
+-    Document ingestion and processing
+-    Vector search with pgvector
+-    Hybrid search (keyword + vector)
+-    Reranking
+-    Metadata extraction
+-    Record management (deduplication)
+-    Multi-format support (PDF, DOCX, HTML, Markdown)
+-    Text-to-SQL tool
+-    Web search fallback
+-    Sub-agents with isolated context
+-    Chat with threads and memory
+-    Streaming responses
+-    Auth with RLS
 
 ### Out of Scope
 - ❌ Knowledge graphs / GraphRAG
@@ -156,10 +156,10 @@ There is no right answer—this is a real architectural choice you'll face in bu
 ## Success Criteria
 
 By the end, students should have:
-- ✅ A working RAG application they built with AI assistance
-- ✅ Deep understanding of RAG concepts (chunking, embedding, retrieval, reranking)
-- ✅ Understanding of codebase structure - what lives where, how pieces connect
-- ✅ Ability to direct AI coding tools to build new features
-- ✅ Ability to direct AI coding tools to debug and fix issues
-- ✅ Experience with agentic patterns (multi-tool, sub-agents)
-- ✅ Observability set up from day one
+-    A working RAG application they built with AI assistance
+-    Deep understanding of RAG concepts (chunking, embedding, retrieval, reranking)
+-    Understanding of codebase structure - what lives where, how pieces connect
+-    Ability to direct AI coding tools to build new features
+-    Ability to direct AI coding tools to debug and fix issues
+-    Experience with agentic patterns (multi-tool, sub-agents)
+-    Observability set up from day one

@@ -229,7 +229,7 @@ function ChatWindow() {
         {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
 
-          {/* 🔥 EMPTY STATE */}
+          {/*   EMPTY STATE */}
           {messages.length === 0 && !loading && (
             <div className="text-center text-gray-500 mt-20">
               <div className="text-3xl mb-3">💬</div>
@@ -237,7 +237,7 @@ function ChatWindow() {
             </div>
           )}
 
-          {/* 🔥 LOADING STATE */}
+          {/*   LOADING STATE */}
           {loading && (
             <div className="text-center text-gray-400 text-sm">
               Loading messages...

@@ -139,7 +139,7 @@ class QueryLog(Base):
 
     num_results = Column(Integer, nullable=True)
 
-    # 🔥 NEW FIELDS
+    #   NEW FIELDS
     retrieval_mode = Column(String, nullable=True)
     model_used = Column(String, nullable=True)
     temperature = Column(String, nullable=True)
@@ -163,7 +163,7 @@ class ChatSession(Base):
 
     title = Column(String, default="New Chat")
 
-    # 🔥 ADD THESE TWO FIELDS HERE
+    #   ADD THESE TWO FIELDS HERE
     is_archived = Column(Boolean, default=False)
     is_pinned = Column(Boolean, default=False)
 

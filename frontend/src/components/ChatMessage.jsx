@@ -27,7 +27,7 @@ function ChatMessage({ role, content, streaming }: any) {
           }
         `}
       >
-        {/* 🔥 HOVER ACTIONS (FIXED) */}
+        {/*   HOVER ACTIONS (FIXED) */}
         {!isUser && (
           <div
             className={`
@@ -54,7 +54,7 @@ function ChatMessage({ role, content, streaming }: any) {
           </div>
         )}
 
-        {/* 🔥 MARKDOWN WITH FORCED STRUCTURE */}
+        {/*   MARKDOWN WITH FORCED STRUCTURE */}
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -126,7 +126,7 @@ function ChatMessage({ role, content, streaming }: any) {
           {content}
         </ReactMarkdown>
 
-        {/* 🔥 STREAM CURSOR */}
+        {/*   STREAM CURSOR */}
         {streaming && <span className="animate-pulse ml-1">|</span>}
       </div>
     </div>

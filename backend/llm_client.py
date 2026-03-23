@@ -14,7 +14,7 @@ class LlmClient:
         if not settings.gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY missing")
 
-        # ✅ Correct configuration
+        #    Correct configuration
         genai.configure(api_key=settings.gemini_api_key)
 
         self.gemini_model = settings.gemini_model
@@ -28,15 +28,13 @@ class LlmClient:
 
         prompt = f"""{system_prompt}
 
-User Question:
-{user_prompt}
-"""
-
-        
-        model_name = "gemini-pro"
+    User Question:
+    {user_prompt}
+    """
 
         try:
-            model_instance = genai.GenerativeModel(model_name)
+            #   Use stable model name supported in current SDK
+            model_instance = genai.GenerativeModel("gemini-1.0-pro")
 
             response = model_instance.generate_content(
                 prompt,
@@ -45,13 +43,10 @@ User Question:
                 }
             )
 
-            if response and getattr(response, "text", None):
+            #   SAFE extraction (important)
+            if response and hasattr(response, "text") and response.text:
                 return response.text.strip()
 
-            if response and response.text:
-                return response.text.strip()
-
-            return "Empty response from model."
             return "Empty response from model."
 
         except Exception as e:

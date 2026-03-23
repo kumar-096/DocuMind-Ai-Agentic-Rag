@@ -18,7 +18,7 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
 
 
-# 🔥 RETRY WRAPPER
+#   RETRY WRAPPER
 def retry_operation(fn, retries=3, delay=2):
     for attempt in range(retries):
         try:
@@ -47,7 +47,7 @@ async def ask_chat(
     if not session:
         raise HTTPException(status_code=404, detail="Chat session not found")
 
-    # ✅ Save user message
+    #    Save user message
     db.add(ChatMessage(
         session_id=payload.session_id,
         role="user",
@@ -69,7 +69,7 @@ async def ask_chat(
             model = settings.model or "gemini"
             retrieval_mode = settings.retrieval_mode or "semantic"
 
-            # 🔥 STREAMING MODE
+            #   STREAMING MODE
             if settings.streaming:
 
                 async def stream_fn():
@@ -100,7 +100,7 @@ async def ask_chat(
                         yield f"data: {json.dumps({'token': str(token)})}\n\n"
 
                 except Exception as e:
-                    # 🔥 QUOTA / FAILURE FALLBACK
+                    #   QUOTA / FAILURE FALLBACK
                     error_text = str(e)
 
                     if "RESOURCE_EXHAUSTED" in error_text:
@@ -114,7 +114,7 @@ async def ask_chat(
 
                     full_answer = fallback
 
-            # 🔥 NON-STREAM MODE
+            #   NON-STREAM MODE
             else:
                 try:
                     response = await asyncio.to_thread(

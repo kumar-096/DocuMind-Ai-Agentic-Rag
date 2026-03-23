@@ -164,7 +164,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: lastUserMessage,
-        session_id: (sessionId ?? 0) as number, // ✅ FIX
+        session_id: (sessionId ?? 0) as number, //    FIX
         top_k: settings?.top_k || 5
       },
       (token) => {
@@ -221,7 +221,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: userMessage.content,
-        session_id: activeSessionId as number, // ✅ FIX
+        session_id: activeSessionId as number, //    FIX
         top_k: settings?.top_k || 5
       },
       (token) => {
@@ -270,7 +270,7 @@ export function ChatPage() {
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      code(props: any) { // ✅ FIX (safe typing)
+                      code(props: any) { //    FIX (safe typing)
                         const { inline, children } = props
 
                         return inline ? (

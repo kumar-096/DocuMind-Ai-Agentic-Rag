@@ -15,7 +15,7 @@ def verify_google_token(token: str):
             settings.google_client_id  # MUST MATCH FRONTEND
         )
 
-        # 🔥 EXTRA SAFETY (audience check)
+        #   EXTRA SAFETY (audience check)
         if idinfo["aud"] != settings.google_client_id:
             return None
 
@@ -25,5 +25,5 @@ def verify_google_token(token: str):
         }
 
     except Exception as e:
-        print("GOOGLE VERIFY ERROR:", str(e))  # 🔥 DEBUG
+        print("GOOGLE VERIFY ERROR:", str(e))  #   DEBUG
         return None

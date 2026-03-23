@@ -28,7 +28,7 @@ class RetrievalEngine:
         self.embedding_model = embedding_model or EmbeddingModel()
         self.vector_store = get_vector_store(dim=self.embedding_model.dimension)
 
-        # 🔥 NEW CACHE
+        #   NEW CACHE
         self.embedding_cache = {}
     # -----------------------------
     # FETCH DB CHUNKS (UNCHANGED)
@@ -125,7 +125,7 @@ class RetrievalEngine:
         return score
 
     # -----------------------------
-    # RERANK FUNCTION (🔥 CORE)
+    # RERANK FUNCTION (  CORE)
     # -----------------------------
     def _rerank(
         self,
@@ -140,7 +140,7 @@ class RetrievalEngine:
         for r in results:
             keyword_boost = self._keyword_score(query, r.chunk.text)
 
-            # 🔥 rerank formula
+            #   rerank formula
             final_score = r.score + 0.3 * keyword_boost
 
             reranked.append(

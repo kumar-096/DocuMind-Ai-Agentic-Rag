@@ -33,7 +33,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict):
     to_encode = data.copy()
 
-    expire = datetime.utcnow() + timedelta(minutes=15)  # ✅ industry standard
+    expire = datetime.utcnow() + timedelta(minutes=15)  #    industry standard
 
     to_encode.update({"exp": expire})
 
@@ -44,7 +44,7 @@ def create_access_token(data: dict):
 def create_refresh_token(data: dict):
     to_encode = data.copy()
 
-    expire = datetime.utcnow() + timedelta(days=7)  # ✅ standard
+    expire = datetime.utcnow() + timedelta(days=7)  #    standard
 
     to_encode.update({"exp": expire})
 
