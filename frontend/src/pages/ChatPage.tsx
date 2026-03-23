@@ -46,88 +46,84 @@ export function ChatPage() {
   useEffect(() => {
 
     if (!sessionId) return
-  
+
     let cancelled = false
-  
+
     async function loadMessages() {
       try {
-  
+
         const stored = await loadSessionMessages(sessionId)
         if (cancelled) return
-  
+
         setMessages(stored.map(m => ({
           id: String(m.id),
           role: m.role,
           content: m.content
         })))
-  
+
       } catch (err: any) {
-  
+
         if (err.message === "SESSION_NOT_FOUND") {
-  
+
           const newSession = await createSession()
-  
+
           if (!cancelled) {
             setSessionId(newSession.id)
-            setMessages([]) // reset UI
+            setMessages([])
           }
-  
+
           return
         }
-  
+
         console.error("Load messages error:", err)
       }
     }
-  
+
     loadMessages()
     return () => { cancelled = true }
-  
+
   }, [sessionId])
+
   /* ---------------- AUTO SCROLL ---------------- */
   useEffect(() => {
-    const el = messagesEndRef.current
-    if (!el) return
-    el.scrollIntoView({ behavior: "smooth" })
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  /* ---------------- STREAM ENGINE (IMPROVED) ---------------- */
+  /* ---------------- STREAM ENGINE ---------------- */
   useEffect(() => {
 
     if (streaming.current) return
     streaming.current = true
-  
+
     function process() {
-  
+
       if (queue.current.length === 0) {
         if (!loading) streaming.current = false
         else setTimeout(process, 20)
         return
       }
-  
+
       const next = queue.current.shift() || ""
-  
+
       setMessages(prev => {
         const updated = [...prev]
         const i = updated.findIndex(m => m.id === assistantRef.current)
         if (i !== -1) updated[i].content += next
         return updated
       })
-  
-      // 🔥 HUMAN-LIKE DELAY ENGINE
+
       let delay = 15
-  
       if (next === " ") delay = 8
-      else if (next === "." || next === "," || next === "\n") delay = 80
+      else if ([".", ",", "\n"].includes(next)) delay = 80
       else if (/[A-Z]/.test(next)) delay = 25
-  
-      // slight randomness (key realism factor)
+
       delay += Math.random() * 10
-  
+
       setTimeout(process, delay)
     }
-  
+
     process()
-  
+
   }, [loading])
 
   /* ---------------- COPY ---------------- */
@@ -143,16 +139,14 @@ export function ChatPage() {
     streaming.current = false
   }
 
-  /* ---------------- FILTER TOKENS ---------------- */
   function isValidToken(token: string) {
-    const bad = ["Copy", "Stop", "Regenerate"]
-    return !bad.some(b => token.includes(b))
+    return !["Copy", "Stop", "Regenerate"].some(b => token.includes(b))
   }
 
   /* ---------------- REGENERATE ---------------- */
   function regenerate(lastUserMessage: string) {
 
-    if (loading) return // prevent stacking
+    if (loading) return
 
     setLoading(true)
 
@@ -170,7 +164,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: lastUserMessage,
-        session_id: sessionId || 0,
+        session_id: (sessionId ?? 0) as number, // ✅ FIX
         top_k: settings?.top_k || 5
       },
       (token) => {
@@ -227,7 +221,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: userMessage.content,
-        session_id: activeSessionId,
+        session_id: activeSessionId as number, // ✅ FIX
         top_k: settings?.top_k || 5
       },
       (token) => {
@@ -243,7 +237,6 @@ export function ChatPage() {
     )
   }
 
-  /* ---------------- ENTER ---------------- */
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -277,9 +270,13 @@ export function ChatPage() {
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      code({ inline, children }) {
+                      code(props: any) { // ✅ FIX (safe typing)
+                        const { inline, children } = props
+
                         return inline ? (
-                          <code className="bg-slate-700 px-1 rounded">{children}</code>
+                          <code className="bg-slate-700 px-1 rounded">
+                            {children}
+                          </code>
                         ) : (
                           <div className="relative">
                             <pre className="bg-black p-3 rounded overflow-x-auto">
@@ -304,7 +301,6 @@ export function ChatPage() {
 
               </div>
 
-              {/* ACTIONS */}
               {m.role === "assistant" && (
                 <div className="flex gap-3 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
 
