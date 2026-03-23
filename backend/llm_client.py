@@ -32,13 +32,8 @@ User Question:
 {user_prompt}
 """
 
-        # 🔥 REAL MODEL SWITCH
-        if model == "gemini":
-            model_name = self.gemini_model
-        elif model == "fast":
-            model_name = "gemini-1.5-flash"
-        else:
-            model_name = self.gemini_model
+        
+        model_name = "gemini-pro"
 
         try:
             model_instance = genai.GenerativeModel(model_name)
