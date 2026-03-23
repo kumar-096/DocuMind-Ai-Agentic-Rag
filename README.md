@@ -22,6 +22,15 @@
 
 <h2 align="center">🖥️ Application Preview</h2>
 
+
+<p align="center">
+  <img src="./assets/auth.png" width="45%" />
+</p>
+
+<p align="center">
+  <i>Secure authentication with email/password and Google login</i>
+</p>
+
 <p align="center">
   <img src="./assets/dashboard.png" width="85%" />
 </p>
@@ -31,14 +40,6 @@
 </p>
 
 <br/>
-
-<p align="center">
-  <img src="./assets/auth.png" width="45%" />
-</p>
-
-<p align="center">
-  <i>Secure authentication with email/password and Google login</i>
-</p>
 
 <br/>
 
@@ -238,7 +239,7 @@ This is not just a chatbot. It demonstrates:<br/>
 <h2 align="center">👨‍💻 Author</h2>
 
 <p align="center">
-Your Name
+Kumar Purushotham
 </p>
 
 <br/>
