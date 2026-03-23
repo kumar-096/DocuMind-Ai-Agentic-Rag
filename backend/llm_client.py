@@ -18,6 +18,8 @@ class LlmClient:
         genai.configure(api_key=settings.gemini_api_key)
 
         self.gemini_model = settings.gemini_model
+    from google.genai import Client
+
     def generate(
         self,
         system_prompt: str,
@@ -33,20 +35,17 @@ class LlmClient:
     """
 
         try:
-            client = genai.Client(api_key=get_settings().gemini_api_key)
+            client = Client(api_key=get_settings().gemini_api_key)
 
             response = client.models.generate_content(
-                model="gemini-1.5-flash",  
+                model=model or self.gemini_model,
                 contents=prompt,
                 config={
                     "temperature": float(temperature)
                 }
             )
 
-            if response and response.text:
-                return response.text.strip()
-
-            return "Empty response from model."
+            return response.text.strip() if response and response.text else "Empty response"
 
         except Exception as e:
-            return f"LLM error: {str(e)}"   
+            raise RuntimeError(f"LLM FAILURE: {str(e)}")

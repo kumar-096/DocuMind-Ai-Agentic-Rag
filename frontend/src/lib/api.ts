@@ -238,8 +238,12 @@ export function askQuestionSSE(
   })
     .then(async res => {
 
-      if (res.status === 401) {
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(text || "Request failed")
+      }
 
+      if (res.status === 401) {
         const refreshRes = await fetch(
           `${BASE_URL}/api/auth/refresh`, //    FIX
           {

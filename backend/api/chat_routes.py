@@ -61,7 +61,7 @@ async def ask_chat(
         import json
 
         full_answer = ""
-
+        yield "data: {}\n\n"
         try:
             settings = pipeline._get_user_settings(db, current_user.id)
 
@@ -100,8 +100,11 @@ async def ask_chat(
                         yield f"data: {json.dumps({'token': str(token)})}\n\n"
 
                 except Exception as e:
-                    #   QUOTA / FAILURE FALLBACK
-                    error_text = str(e)
+                    error_msg = f"STREAM ERROR: {str(e)}"
+                    print(error_msg)
+
+                    yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                    return
 
                     if "RESOURCE_EXHAUSTED" in error_text:
                         fallback = "⚠️ Rate limit reached. Please try again in a few seconds."
@@ -156,8 +159,10 @@ async def ask_chat(
                 except Exception as e:
                     print("DB SAVE ERROR:", str(e))
 
-            await asyncio.to_thread(save)
-
+            try:
+                save()
+            except Exception as e:
+                print("DB SAVE ERROR:", str(e))
             yield f"data: {json.dumps({'done': True})}\n\n"
 
     return StreamingResponse(
