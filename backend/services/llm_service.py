@@ -42,6 +42,7 @@ def safe_generate(prompt: str, temperature: float) -> str:
                 print(f"Quota hit. Retrying in {wait_time}s...")
                 time.sleep(wait_time)
                 continue
+            print("LLM ERROR RAW:", error_text)
 
             return f"LLM error: {error_text}"
 

@@ -290,7 +290,10 @@ export function askQuestionSSE(
 
                 if (json.token) onToken(json.token)
                 if (json.done) return onDone()
-                if (json.error) return onError(json.error)
+                if (json.error) {
+                  onToken("⚠️ " + json.error)
+                  return onDone()
+                }
 
               } catch (err) {
                 console.error("JSON parse error", err)

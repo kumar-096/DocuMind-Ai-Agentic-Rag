@@ -230,8 +230,11 @@ export function ChatPage() {
         }
       },
       () => setLoading(false),
-      () => {
-        setError("Streaming error")
+      (err) => {
+        console.error("Streaming error:", err)
+
+        
+        setError(typeof err === "string" ? err : "Something went wrong")
         setLoading(false)
       }
     )
@@ -334,7 +337,11 @@ export function ChatPage() {
             </div>
           )}
 
-          {error && <div className="text-red-400 text-sm">{error}</div>}
+          {error && (
+            <div className="text-yellow-400 text-sm bg-yellow-900/20 p-2 rounded">
+              ⚠️ {error}
+            </div>
+          )}
 
           <div ref={messagesEndRef} />
 

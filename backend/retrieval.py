@@ -106,7 +106,7 @@ class RetrievalEngine:
                         document=doc,
                     )
                 )
-
+        
         return results
 
     # -----------------------------
