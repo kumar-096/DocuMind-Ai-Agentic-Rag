@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useChat } from "../../context/ChatContext"
 import { useAuth } from "../../context/AuthContext"
 import type { ChatSession } from "../../lib/api"
