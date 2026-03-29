@@ -23,7 +23,7 @@ llm = LlmClient()
 # SAFE GENERATE (RETRY + QUOTA HANDLING)
 # ----------------------------------------
 def safe_generate(prompt: str, temperature: float) -> str:
-    MAX_RETRIES = 3
+    MAX_RETRIES = 1
 
     for attempt in range(MAX_RETRIES):
         try:
@@ -57,16 +57,15 @@ def safe_generate(prompt: str, temperature: float) -> str:
 # ----------------------------------------
 async def llm_stream_async(prompt: str, temperature: float):
 
-    # Run blocking LLM call in background thread
     full_text = await asyncio.to_thread(safe_generate, prompt, temperature)
 
     if not full_text:
         yield "No response generated."
         return
 
-    # Chunk size controls streaming speed
-    chunk_size = 50
+    # 🔥 FIX: smaller chunks
+    chunk_size = 120
 
     for i in range(0, len(full_text), chunk_size):
         yield full_text[i:i + chunk_size]
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.02)

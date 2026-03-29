@@ -37,11 +37,14 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def startup():
         print("Creating database tables...")
+
         try:
             Base.metadata.create_all(bind=engine)
-            print("Database connected successfully")
+            print("✅ Database connected successfully")
+
         except Exception as e:
-            print("Database connection failed:", e)
+            print("⚠️ Database failed — running WITHOUT DB")
+            print("ERROR:", e)
 
     # existing API routes
     app.include_router(api_router)

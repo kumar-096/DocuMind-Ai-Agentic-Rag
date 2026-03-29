@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Optional
 from google.genai import Client
+import time
 
 from settings import get_settings
 
 
-class LlmClient:
+class LlmClient:    
 
     def __init__(self) -> None:
         settings = get_settings()
@@ -14,10 +15,11 @@ class LlmClient:
         if not settings.gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY missing")
 
-        # Initialize client ONCE
         self.client = Client(api_key=settings.gemini_api_key)
-        self.gemini_model = settings.gemini_model
 
+        # 🔥 Always use cheapest model
+        self.model = "gemini-2.5-flash"
+        print("USING MODEL:", self.model)
     def generate(
         self,
         system_prompt: str,
@@ -26,25 +28,24 @@ class LlmClient:
         model: Optional[str] = None,
     ) -> str:
 
-        prompt = f"""{system_prompt}
-
-User Question:
-{user_prompt}
-"""
+        # ✅ DO NOT MODIFY PROMPT (RAG already built it)
+        prompt = user_prompt
 
         try:
+            time.sleep(2)  # rate control
+
             response = self.client.models.generate_content(
-                model=model or self.gemini_model,
+                model=self.model,
                 contents=prompt,
                 config={
-                    "temperature": float(temperature)
+                    "temperature": 0.7,
+                    "max_output_tokens": 3000,   
+                    "top_p": 0.95,               
                 }
             )
 
-            if response and response.text:
-                return response.text.strip()
-
-            return "Empty response from model."
+            return response.text.strip() if response.text else "No response"
 
         except Exception as e:
-            raise RuntimeError(f"LLM FAILURE: {str(e)}")
+            print("🔥 FULL LLM ERROR:", repr(e))
+            return "⚠️ Demo mode: LLM unavailable"

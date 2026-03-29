@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import asyncio
 import time
+import json
 
 from db import get_db, engine
 from models import Base, ChatMessage, ChatSession, User
@@ -18,15 +19,20 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
 
 
-#   RETRY WRAPPER
-def retry_operation(fn, retries=3, delay=2):
-    for attempt in range(retries):
-        try:
-            return fn()
-        except Exception as e:
-            if attempt == retries - 1:
-                raise e
-            time.sleep(delay * (attempt + 1))
+# ==============================
+# 🔥 RATE LIMIT
+# ==============================
+last_request_time = {}
+
+def allow_request(user_id: int):
+    now = time.time()
+
+    if user_id in last_request_time:
+        if now - last_request_time[user_id] < 3:
+            return False
+
+    last_request_time[user_id] = now
+    return True
 
 
 @router.post("/ask")
@@ -37,7 +43,10 @@ async def ask_chat(
 ):
 
     if not payload.query.strip():
-        raise HTTPException(status_code=400, detail="Query must not be empty")
+        raise HTTPException(400, "Query must not be empty")
+
+    if not allow_request(current_user.id):
+        raise HTTPException(429, "Too many requests. Wait a few seconds.")
 
     session = db.query(ChatSession).filter(
         ChatSession.id == payload.session_id,
@@ -45,9 +54,9 @@ async def ask_chat(
     ).first()
 
     if not session:
-        raise HTTPException(status_code=404, detail="Chat session not found")
+        raise HTTPException(404, "Chat session not found")
 
-    #    Save user message
+    # Save user message
     db.add(ChatMessage(
         session_id=payload.session_id,
         role="user",
@@ -58,32 +67,19 @@ async def ask_chat(
     pipeline = RagPipeline()
 
     async def event_stream():
-        import json
-
         full_answer = ""
+
+        # 🔥 Initial ping (important for frontend)
         yield "data: {}\n\n"
+
         try:
             settings = pipeline._get_user_settings(db, current_user.id)
 
             temperature = float(settings.temperature or 0.7)
-            model = settings.model or "gemini"
+            model = settings.model or "gemini-2.5-flash"
             retrieval_mode = settings.retrieval_mode or "semantic"
 
-            #   STREAMING MODE
             if settings.streaming:
-
-                async def stream_fn():
-                    async for token in pipeline.stream_answer(
-                        db=db,
-                        query=payload.query,
-                        user_id=current_user.id,
-                        top_k=payload.top_k,
-                        document_ids=payload.document_ids,
-                        temperature=temperature,
-                        model=model,
-                        retrieval_mode=retrieval_mode
-                    ):
-                        return token  # handled below
 
                 try:
                     async for token in pipeline.stream_answer(
@@ -96,58 +92,45 @@ async def ask_chat(
                         model=model,
                         retrieval_mode=retrieval_mode
                     ):
-                        full_answer += token
-                        yield f"data: {json.dumps({'token': str(token)})}\n\n"
+                        if token:
+                            full_answer += token
+
+                            # 🔥 CRITICAL: flush each chunk properly
+                            yield f"data: {json.dumps({'token': token})}\n\n"
+
+                            await asyncio.sleep(0)  # force flush
 
                 except Exception as e:
-                    error_msg = str(e)
-                    print("STREAM ERROR:", error_msg)
+                    print("STREAM ERROR:", str(e))
 
-                    if any(x in error_msg.lower() for x in ["rate", "quota", "exceeded"]):
-                        fallback = "⚠️ Rate limit reached. Try again later."
-                    else:
-                        fallback = "⚠️ Failed to generate response."
+                    fallback = "⚠️ Unable to generate response."
+                    full_answer = fallback
 
                     for word in fallback.split():
                         yield f"data: {json.dumps({'token': word + ' '})}\n\n"
                         await asyncio.sleep(0.03)
 
-                    return
-
-                    if "RESOURCE_EXHAUSTED" in error_text:
-                        fallback = "⚠️ Rate limit reached. Please try again in a few seconds."
-                    else:
-                        fallback = "⚠️ Something went wrong while generating response."
-
-                    for word in fallback.split(" "):
-                        yield f"data: {json.dumps({'token': word + ' '})}\n\n"
-                        await asyncio.sleep(0.05)
-
-                    full_answer = fallback
-
-            #   NON-STREAM MODE
             else:
                 try:
                     response = await asyncio.to_thread(
-                        lambda: retry_operation(
-                            lambda: pipeline.answer_question(
-                                db,
-                                payload.query,
-                                current_user.id,
-                                payload.top_k,
-                                payload.document_ids,
-                                temperature,
-                                model,
-                                retrieval_mode
-                            )
+                        lambda: pipeline.answer_question(
+                            db,
+                            payload.query,
+                            current_user.id,
+                            payload.top_k,
+                            payload.document_ids,
+                            temperature,
+                            model,
+                            retrieval_mode
                         )
                     )
 
                     full_answer = response.answer
+
                     yield f"data: {json.dumps({'full': full_answer})}\n\n"
 
                 except Exception:
-                    fallback = "⚠️ Unable to generate response right now."
+                    fallback = "⚠️ Unable to generate response."
                     full_answer = fallback
                     yield f"data: {json.dumps({'full': fallback})}\n\n"
 
@@ -155,22 +138,18 @@ async def ask_chat(
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         finally:
-
-            def save():
-                try:
-                    db.add(ChatMessage(
-                        session_id=payload.session_id,
-                        role="assistant",
-                        content=full_answer,
-                    ))
-                    db.commit()
-                except Exception as e:
-                    print("DB SAVE ERROR:", str(e))
-
+            # 🔥 SAVE RESPONSE
             try:
-                save()
+                db.add(ChatMessage(
+                    session_id=payload.session_id,
+                    role="assistant",
+                    content=full_answer,
+                ))
+                db.commit()
             except Exception as e:
                 print("DB SAVE ERROR:", str(e))
+
+            # 🔥 FINAL SIGNAL (MANDATORY)
             yield f"data: {json.dumps({'done': True})}\n\n"
 
     return StreamingResponse(

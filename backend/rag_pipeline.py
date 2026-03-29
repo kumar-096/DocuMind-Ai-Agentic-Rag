@@ -10,53 +10,59 @@ from llm_client import LlmClient
 from models import QueryLog, UserSettings
 from retrieval import RetrievalEngine
 from security.prompt_guard import sanitize_context
-from cache import get_cache, set_cache   #    NEW
+from cache import get_cache, set_cache
 
 
+# ==============================
+# STRUCTURED PROMPT
+# ==============================
 def build_structured_prompt(context_text: str, query: str) -> str:
     return f"""
-You are a highly skilled AI assistant.
+You are a helpful AI assistant.
 
-Your response should feel like ChatGPT:
-- clear
-- well spaced
-- easy to scan
-- professional, not textbook
-
-FORMAT RULES:
-
-- Use section headings with emojis
-- Keep paragraphs short (1–2 lines)
-- Add spacing between sections
-- Use bullet points where helpful
-- Avoid long dense text
-- Be conversational but precise
-
-STRUCTURE:
+Use the context if relevant. If not, answer using your own knowledge.
 
 ## 🚀 Answer
-Give a direct answer (concise)
+Provide a detailed explanation (at least 5–6 lines)
 
 ## 🧠 Key Idea
-Explain simply in 2–3 lines
+Explain simply
 
 ## 🔍 Breakdown
-- Key point 1
-- Key point 2
-- Key point 3
-
-## 📌 Example (if useful)
-Short practical example
+- Key concept
+- How it works
+- Why it matters
 
 ## ⚡ Summary
 1–2 line takeaway
 
 Context:
-{context_text}
+{context_text[:300]}
 
 Question:
 {query}
+IMPORTANT: Do NOT stop early. Complete all sections fully.
 """
+
+
+def should_use_rag(query: str, retrieved) -> bool:
+    if not retrieved:
+        return False
+
+    # 🔥 remove short / useless words
+    query_words = [w for w in query.lower().split() if len(w) > 4]
+
+    if not query_words:
+        return False
+
+    chunk_text = retrieved[0].chunk.text.lower()
+
+    overlap = sum(1 for w in query_words if w in chunk_text)
+
+    print("DEBUG → OVERLAP:", overlap)
+
+    # 🔥 STRICT condition (main fix)
+    return overlap >= 2
 
 
 class RagPipeline:
@@ -89,12 +95,11 @@ class RagPipeline:
         top_k: Optional[int] = None,
         document_ids: Optional[List[int]] = None,
         temperature: float = 0.7,
-        model: str = "gemini",
+        model: str = "gemini-2.5-flash",
         retrieval_mode: str = "semantic"
     ):
 
-        #   CACHE KEY (SAFE)
-        cache_key = f"{user_id}:{query}:{retrieval_mode}"
+        cache_key = query.strip().lower()
 
         cached = get_cache(cache_key)
         if cached:
@@ -116,50 +121,66 @@ class RagPipeline:
 
         latency_ms = int((perf_counter() - start) * 1000)
 
-        if not retrieved:
-            return ChatResponse(
-                answer="No relevant information found.",
-                citations=[],
-                retrieved_chunks=[]
-            )
+        # 🔥 SMART DECISION
+        use_rag = should_use_rag(query, retrieved)
 
-        context_blocks = []
+        print("USE_RAG:", use_rag)
 
-        for i, r in enumerate(retrieved, start=1):
-            meta = r.chunk.meta or {}
-            page = meta.get("page")
+        context_text = ""
 
-            source_label = f"{r.document.filename}"
-            if page:
-                source_label += f" page {page}"
+        if use_rag:
+            context_blocks = []
 
-            context_blocks.append(
-                f"[{i}] {source_label} (chunk {r.chunk.chunk_index})\n{r.chunk.text}"
-            )
+            for i, r in enumerate(retrieved[:1], start=1):
+                context_blocks.append(
+                    f"[{i}] {r.document.filename}\n{r.chunk.text[:200]}"
+                )
 
-        context_text = sanitize_context("\n\n".join(context_blocks))
+            context_text = sanitize_context("\n\n".join(context_blocks))
 
-        prompt = build_structured_prompt(context_text, query)
+            prompt = build_structured_prompt(context_text, query)
+
+        else:
+            prompt = f"""
+Answer clearly:
+
+## 🚀 Answer
+Provide a clear answer
+
+## 🧠 Key Idea
+Explain simply
+
+## 🔍 Breakdown
+- key point
+- key point
+- key point
+
+## ⚡ Summary
+1–2 lines
+
+Question:
+{query}
+"""
 
         answer = self.llm_client.generate(
-            system_prompt="You are a structured AI assistant.",
+            system_prompt="",
             user_prompt=prompt,
             temperature=temperature,
             model=model,
         )
 
+        # -----------------------------
+        # RESPONSE BUILD
+        # -----------------------------
         citations: List[Citation] = []
         retrieved_chunks: List[RetrievedChunk] = []
 
         for r in retrieved:
-            meta = r.chunk.meta or {}
-            page = meta.get("page")
-
             citations.append(
                 Citation(
                     document_id=r.document.id,
                     filename=r.document.filename,
-                    page=page,
+                    page=(r.chunk.meta or {}).get("page"),
                     chunk_index=r.chunk.chunk_index,
                 )
             )
@@ -171,13 +192,15 @@ class RagPipeline:
                     text=r.chunk.text,
                     score=r.score,
                     filename=r.document.filename,
-                    page=page,
+                    page=(r.chunk.meta or {}).get("page"),
                 )
             )
 
-        avg_score = sum(r.score for r in retrieved) / len(retrieved)
+        final_answer = answer
 
-        final_answer = f"{answer}\n\n---\n**Confidence Score:** {round(avg_score, 2)}"
+        if retrieved:
+            avg_score = sum(r.score for r in retrieved) / len(retrieved)
+            final_answer += f"\n\n---\n**Confidence Score:** {round(avg_score, 2)}"
 
         response = ChatResponse(
             answer=final_answer,
@@ -185,7 +208,6 @@ class RagPipeline:
             retrieved_chunks=retrieved_chunks
         )
 
-        #   SAVE CACHE (FULL OBJECT)
         set_cache(cache_key, response.dict())
 
         self._log_query(
@@ -211,7 +233,7 @@ class RagPipeline:
         top_k: Optional[int] = None,
         document_ids: Optional[List[int]] = None,
         temperature: float = 0.7,
-        model: str = "gemini",
+        model: str = "gemini-2.5-flash",
         retrieval_mode: str = "semantic"
     ):
         import asyncio
@@ -232,21 +254,43 @@ class RagPipeline:
 
         retrieved = await asyncio.to_thread(run_retrieval)
 
-        if not retrieved:
-            yield "No relevant information found."
-            return
+        use_rag = should_use_rag(query, retrieved)
 
-        #   LIMIT CONTEXT SIZE (CRITICAL FIX)
-        context_blocks = []
+        print("STREAM USE_RAG:", use_rag)
 
-        for i, r in enumerate(retrieved[:2], start=1):
-            text = r.chunk.text[:300]  # truncate large chunks
-            context_blocks.append(
-                f"[{i}] {r.document.filename} (chunk {r.chunk.chunk_index})\n{text}"
-            )
+        if use_rag:
+            context_blocks = []
+            for i, r in enumerate(retrieved[:1], start=1):
+                context_blocks.append(
+                    f"[{i}] {r.document.filename}\n{r.chunk.text[:200]}"
+                )
 
-        context_text = sanitize_context("\n\n".join(context_blocks))
-        prompt = build_structured_prompt(context_text, query)
+            context_text = sanitize_context("\n\n".join(context_blocks))
+            prompt = build_structured_prompt(context_text, query)
+
+        else:
+            prompt = f"""
+        You are a helpful AI assistant.
+
+        Answer in a detailed and structured way.
+
+        ## 🚀 Answer
+        Provide a complete explanation (minimum 5–6 lines)
+
+        ## 🧠 Key Idea
+        Explain simply
+
+        ## 🔍 Breakdown
+        - Explain how it works
+        - Mention key components
+        - Give intuition
+
+        ## ⚡ Summary
+        Short takeaway
+
+        Question:
+        {query}
+        """
 
         async for token in llm_stream_async(prompt, temperature):
             if token:

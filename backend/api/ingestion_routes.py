@@ -12,9 +12,7 @@ from core.auth_dependency import get_current_user
 router = APIRouter(prefix="/api/ingest", tags=["ingestion"])
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 
-@router.on_event("startup")
-def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
+
 
 
 @router.post("/upload", response_model=UploadedDocumentResponse)
