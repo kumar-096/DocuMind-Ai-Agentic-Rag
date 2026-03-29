@@ -239,8 +239,8 @@ class RagPipeline:
         #   LIMIT CONTEXT SIZE (CRITICAL FIX)
         context_blocks = []
 
-        for i, r in enumerate(retrieved[:3], start=1):
-            text = r.chunk.text[:500]  # truncate large chunks
+        for i, r in enumerate(retrieved[:2], start=1):
+            text = r.chunk.text[:300]  # truncate large chunks
             context_blocks.append(
                 f"[{i}] {r.document.filename} (chunk {r.chunk.chunk_index})\n{text}"
             )

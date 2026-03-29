@@ -100,10 +100,18 @@ async def ask_chat(
                         yield f"data: {json.dumps({'token': str(token)})}\n\n"
 
                 except Exception as e:
-                    error_msg = f"STREAM ERROR: {str(e)}"
-                    print(error_msg)
+                    error_msg = str(e)
+                    print("STREAM ERROR:", error_msg)
 
-                    yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                    if any(x in error_msg.lower() for x in ["rate", "quota", "exceeded"]):
+                        fallback = "⚠️ Rate limit reached. Try again later."
+                    else:
+                        fallback = "⚠️ Failed to generate response."
+
+                    for word in fallback.split():
+                        yield f"data: {json.dumps({'token': word + ' '})}\n\n"
+                        await asyncio.sleep(0.03)
+
                     return
 
                     if "RESOURCE_EXHAUSTED" in error_text:

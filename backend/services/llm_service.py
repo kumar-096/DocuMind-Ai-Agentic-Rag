@@ -35,18 +35,21 @@ def safe_generate(prompt: str, temperature: float) -> str:
 
         except Exception as e:
             error_text = str(e)
-
-            # Handle quota errors
-            if "RESOURCE_EXHAUSTED" in error_text:
-                wait_time = 12 + attempt * 5
-                print(f"Quota hit. Retrying in {wait_time}s...")
-                time.sleep(wait_time)
-                continue
             print("LLM ERROR RAW:", error_text)
 
-            return f"LLM error: {error_text}"
+            # Proper detection
+            if any(x in error_text.lower() for x in [
+                "rate", "quota", "exceeded", "resource_exhausted"
+            ]):
+                wait_time = 10 + attempt * 5
+                print(f"Rate limit detected. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                continue
 
-    return "⚠️ Rate limit exceeded. Please try again later."
+            # REAL ERROR RETURN
+            return f"LLM failure: {error_text}"
+
+    return "⚠️ API quota exhausted or rate limited."
 
 
 # ----------------------------------------
