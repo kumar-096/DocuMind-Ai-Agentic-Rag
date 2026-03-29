@@ -59,7 +59,7 @@ const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 
 /* =====================================================
-   GLOBAL ABORT CONTROLLER
+   GLOBAL ABORT CONTROLLER (FIXED)
 ===================================================== */
 
 let currentController: AbortController | null = null
@@ -72,7 +72,7 @@ export function cancelCurrentRequest() {
 }
 
 /* =====================================================
-   FETCH WITH TIMEOUT
+   FETCH WITH TIMEOUT (IMPROVED)
 ===================================================== */
 
 export async function fetchWithTimeout(
@@ -88,6 +88,7 @@ export async function fetchWithTimeout(
     ...options,
     credentials: "include",
     headers: {
+      "Content-Type": "application/json",
       ...(options.headers || {})
     },
     signal: controller.signal
@@ -98,7 +99,7 @@ export async function fetchWithTimeout(
 }
 
 /* =====================================================
-   RETRY HELPER
+   RETRY HELPER (SAFE)
 ===================================================== */
 
 async function retryRequest(
@@ -107,13 +108,19 @@ async function retryRequest(
 ): Promise<Response> {
 
   try {
-    return await fn()
+    const res = await fn()
+
+    // retry only server errors
+    if (!res.ok && res.status >= 500 && retries > 0) {
+      await new Promise(r => setTimeout(r, 500))
+      return retryRequest(fn, retries - 1)
+    }
+
+    return res
+
   } catch (error) {
-
     if (retries <= 0) throw error
-
-    await new Promise((r) => setTimeout(r, 500))
-
+    await new Promise(r => setTimeout(r, 500))
     return retryRequest(fn, retries - 1)
   }
 }
@@ -127,7 +134,6 @@ export async function loginUser(email: string, password: string) {
   const res = await retryRequest(() =>
     fetchWithTimeout(`${BASE_URL}/api/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     })
   )
@@ -172,15 +178,7 @@ export async function uploadDocument(file: File): Promise<DocumentMetadata> {
     throw new Error(msg || "Failed to upload document")
   }
 
-  let data
-
-  try {
-    data = await res.json()
-  } catch {
-    const text = await res.text()
-    console.error("Invalid JSON:", text)
-    throw new Error("Invalid server response")
-  }
+  const data = await res.json()
   return data.document
 }
 
@@ -209,7 +207,7 @@ export async function deleteDocument(id: number) {
 }
 
 /* =====================================================
-   CHAT (FIXED SSE)
+   CHAT (SSE FIXED PROPERLY)
 ===================================================== */
 
 function getCSRFToken() {
@@ -224,17 +222,18 @@ export function askQuestionSSE(
   onError: (err: any) => void
 ) {
 
-  const controller = new AbortController()
+  // FIX: global controller
+  currentController = new AbortController()
 
   fetch(`${BASE_URL}/api/chat/ask`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "X-CSRF-Token": getCSRFToken() //    FIX
+      "X-CSRF-Token": getCSRFToken()
     },
     body: JSON.stringify(payload),
-    signal: controller.signal
+    signal: currentController.signal
   })
     .then(async res => {
 
@@ -245,11 +244,8 @@ export function askQuestionSSE(
 
       if (res.status === 401) {
         const refreshRes = await fetch(
-          `${BASE_URL}/api/auth/refresh`, //    FIX
-          {
-            method: "POST",
-            credentials: "include"
-          }
+          `${BASE_URL}/api/auth/refresh`,
+          { method: "POST", credentials: "include" }
         )
 
         if (!refreshRes.ok) {
@@ -263,7 +259,6 @@ export function askQuestionSSE(
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
-
       let buffer = ""
 
       function read() {
@@ -290,8 +285,10 @@ export function askQuestionSSE(
 
                 if (json.token) onToken(json.token)
                 if (json.done) return onDone()
+
+                // FIX: proper error handling
                 if (json.error) {
-                  onToken("⚠️ " + json.error)
+                  onError(json.error)
                   return onDone()
                 }
 
@@ -313,11 +310,16 @@ export function askQuestionSSE(
     })
     .catch(onError)
 
-  return () => controller.abort()
+  return () => {
+    if (currentController) {
+      currentController.abort()
+      currentController = null
+    }
+  }
 }
 
 /* =====================================================
-   CHAT SESSIONS (UNCHANGED)
+   CHAT SESSIONS
 ===================================================== */
 
 export async function createSession(): Promise<ChatSession> {
@@ -375,11 +377,8 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   if (res.status === 401) {
 
     const refreshRes = await fetch(
-      `${BASE_URL}/api/auth/refresh`, //    FIX
-      {
-        method: "POST",
-        credentials: "include"
-      }
+      `${BASE_URL}/api/auth/refresh`,
+      { method: "POST", credentials: "include" }
     )
 
     if (!refreshRes.ok) {
@@ -401,7 +400,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 }
 
 /* =====================================================
-   SETTINGS (UNCHANGED)
+   SETTINGS
 ===================================================== */
 
 export async function getSettings() {
