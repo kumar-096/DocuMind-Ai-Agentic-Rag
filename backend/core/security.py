@@ -12,7 +12,7 @@ SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
 
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["bcrypt_sha256"],
     deprecated="auto",
 )
 
