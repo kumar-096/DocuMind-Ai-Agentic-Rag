@@ -7,7 +7,7 @@ import SettingsPage from "./pages/SettingsPage"
 import { useAuth } from "./context/AuthContext"
 import { SourceProvider } from "./context/SourceContext"
 import { ToastProvider } from "./context/ToastContext"   //    NEW
-
+import { ChatProvider } from "./context/ChatContext"
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
 
@@ -60,16 +60,16 @@ function AppRoutes() {
 
 
 function App() {
-
   return (
     <SourceProvider>
-      <ToastProvider> {/*    GLOBAL TOAST SYSTEM */}
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+      <ToastProvider>
+        
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        
       </ToastProvider>
     </SourceProvider>
   )
 }
-
 export default App

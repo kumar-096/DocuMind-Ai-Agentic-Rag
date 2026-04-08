@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { GoogleLogin } from "@react-oauth/google"
+
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
-export function LoginPage() {
 
+export function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -15,14 +16,11 @@ export function LoginPage() {
   const [error, setError] = useState("")
   const [isSignup, setIsSignup] = useState(false)
 
-  /* ---------------- VALIDATORS ---------------- */
-
   function isValidEmail(email: string) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    return /^[A-Za-z0-9._%+-]+@gmail\.com$/i.test(email)
   }
 
   function getPasswordStrength(password: string) {
-
     let score = 0
 
     if (password.length >= 8) score++
@@ -40,38 +38,32 @@ export function LoginPage() {
     return "Very Strong"
   }
 
-  /* ---------------- SUBMIT ---------------- */
-
   async function handleSubmit(e: React.FormEvent) {
-
     e.preventDefault()
     setError("")
-
-    // 🔴 EMAIL VALIDATION
-    if (!isValidEmail(email)) {
-      setError("Invalid email format")
-      return
-    }
-
-    // 🔴 SIGNUP VALIDATION
-    if (isSignup) {
-
-      if (password !== confirmPassword) {
-        setError("Passwords do not match")
-        return
-      }
-
-      const strength = getPasswordStrength(password)
-
-      if (strength < 3) {
-        setError("Password too weak (use uppercase, number, symbol, 8+ chars)")
-        return
-      }
-    }
-
     setLoading(true)
 
     try {
+      if (!isValidEmail(email)) {
+        setError("Invalid Gmail format")
+        return
+      }
+
+      if (isSignup) {
+        if (password !== confirmPassword) {
+          setError("Passwords do not match")
+          return
+        }
+
+        const strength = getPasswordStrength(password)
+
+        if (strength < 3) {
+          setError(
+            "Password too weak (uppercase, number, symbol, 8+ chars)"
+          )
+          return
+        }
+      }
 
       const endpoint = isSignup
         ? `${BASE_URL}/api/auth/signup`
@@ -89,24 +81,19 @@ export function LoginPage() {
       if (!res.ok) {
         const text = await res.text()
         setError(text || "Authentication failed")
-        setLoading(false)
         return
       }
 
       window.location.href = "/"
-
     } catch (err) {
       console.error(err)
       setError("Something went wrong")
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
-  /* ---------------- GOOGLE ---------------- */
-
   async function handleGoogleLogin(token: string | undefined) {
-
     if (!token) return
 
     try {
@@ -114,7 +101,9 @@ export function LoginPage() {
         `${BASE_URL}/api/auth/google`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           credentials: "include",
           body: JSON.stringify({ token })
         }
@@ -126,7 +115,6 @@ export function LoginPage() {
       }
 
       window.location.href = "/"
-
     } catch (err) {
       console.error(err)
       setError("Google error")
@@ -136,11 +124,8 @@ export function LoginPage() {
   const strength = getPasswordStrength(password)
 
   return (
-
     <div className="h-screen flex items-center justify-center bg-slate-950">
-
       <div className="w-[420px] bg-slate-900 p-8 rounded-xl space-y-6">
-
         <h1 className="text-xl font-semibold text-white">
           {isSignup ? "Create Account" : "Sign in"}
         </h1>
@@ -152,18 +137,19 @@ export function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* EMAIL */}
           <input
+            autoComplete="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full p-2 rounded bg-slate-800 text-white"
           />
 
-          {/* PASSWORD */}
           <div className="relative">
             <input
+              autoComplete={
+                isSignup ? "new-password" : "current-password"
+              }
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
@@ -179,17 +165,16 @@ export function LoginPage() {
             </span>
           </div>
 
-          {/* PASSWORD STRENGTH (ONLY SIGNUP) */}
           {isSignup && password && (
             <div className="text-xs text-slate-400">
               Strength: {getStrengthLabel(strength)}
             </div>
           )}
 
-          {/* CONFIRM PASSWORD */}
           {isSignup && (
             <div className="relative">
               <input
+                autoComplete="new-password"
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="Confirm Password"
                 value={confirmPassword}
@@ -198,7 +183,9 @@ export function LoginPage() {
               />
 
               <span
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                onClick={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
                 className="absolute right-3 top-2 cursor-pointer text-slate-400"
               >
                 {showConfirmPassword ? "🙈" : "👁"}
@@ -216,10 +203,8 @@ export function LoginPage() {
               ? "Create Account"
               : "Sign in"}
           </button>
-
         </form>
 
-        {/* TOGGLE */}
         <button
           onClick={() => setIsSignup(!isSignup)}
           className="text-sm text-blue-400 w-full"
@@ -239,9 +224,7 @@ export function LoginPage() {
             onError={() => setError("Google failed")}
           />
         </div>
-
       </div>
-
     </div>
   )
 }

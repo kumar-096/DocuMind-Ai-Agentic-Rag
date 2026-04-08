@@ -56,16 +56,6 @@ def safe_generate(prompt: str, temperature: float) -> str:
 # STREAMING (CHUNK-BASED)
 # ----------------------------------------
 async def llm_stream_async(prompt: str, temperature: float):
-
-    full_text = await asyncio.to_thread(safe_generate, prompt, temperature)
-
-    if not full_text:
-        yield "No response generated."
-        return
-
-    # 🔥 FIX: smaller chunks
-    chunk_size = 120
-
-    for i in range(0, len(full_text), chunk_size):
-        yield full_text[i:i + chunk_size]
-        await asyncio.sleep(0.02)
+    for token in llm.stream_generate(prompt, temperature):
+        yield token
+        await asyncio.sleep(0)

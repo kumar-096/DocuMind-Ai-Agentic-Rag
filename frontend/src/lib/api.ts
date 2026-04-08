@@ -80,15 +80,16 @@ export async function fetchWithTimeout(
   options: RequestInit = {},
   timeout = 30000
 ): Promise<Response> {
-
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+  const isFormData = options.body instanceof FormData
 
   const response = await fetch(url, {
     ...options,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers || {})
     },
     signal: controller.signal
@@ -220,10 +221,10 @@ export function askQuestionSSE(
   onToken: (token: string) => void,
   onDone: () => void,
   onError: (err: any) => void
-) {
-
-  // FIX: global controller
+) { 
+  console.log("🌐 askQuestionSSE called", payload)
   currentController = new AbortController()
+  let completed = false   // ✅ prevent duplicate onDone
 
   fetch(`${BASE_URL}/api/chat/ask`, {
     method: "POST",
@@ -236,23 +237,9 @@ export function askQuestionSSE(
     signal: currentController.signal
   })
     .then(async res => {
-
       if (!res.ok) {
         const text = await res.text()
         throw new Error(text || "Request failed")
-      }
-
-      if (res.status === 401) {
-        const refreshRes = await fetch(
-          `${BASE_URL}/api/auth/refresh`,
-          { method: "POST", credentials: "include" }
-        )
-
-        if (!refreshRes.ok) {
-          return onError("Session expired")
-        }
-
-        return askQuestionSSE(payload, onToken, onDone, onError)
       }
 
       if (!res.body) throw new Error("No stream")
@@ -261,11 +248,17 @@ export function askQuestionSSE(
       const decoder = new TextDecoder()
       let buffer = ""
 
+      function finish() {
+        if (!completed) {
+          completed = true
+          onDone()
+        }
+      }
+
       function read() {
         reader.read().then(({ done, value }) => {
-
           if (done) {
-            onDone()
+            finish()
             return
           }
 
@@ -274,26 +267,28 @@ export function askQuestionSSE(
           let boundary = buffer.indexOf("\n\n")
 
           while (boundary !== -1) {
-
             const chunk = buffer.slice(0, boundary)
             buffer = buffer.slice(boundary + 2)
 
             if (chunk.startsWith("data: ")) {
-
               try {
-                const json = JSON.parse(chunk.replace("data: ", ""))
+                const parsed = JSON.parse(chunk.replace("data: ", ""))
 
-                if (json.token) onToken(json.token)
-                if (json.done) return onDone()
+                if (parsed.token) onToken(parsed.token)
 
-                // FIX: proper error handling
-                if (json.error) {
-                  onError(json.error)
-                  return onDone()
+                if (parsed.error) {
+                  onError(parsed.error)
+                  finish()
+                  return
+                }
+
+                if (parsed.done) {
+                  finish()
+                  return
                 }
 
               } catch (err) {
-                console.error("JSON parse error", err)
+                console.error("SSE parse error:", err)
               }
             }
 
@@ -301,12 +296,10 @@ export function askQuestionSSE(
           }
 
           read()
-
         }).catch(onError)
       }
 
       read()
-
     })
     .catch(onError)
 

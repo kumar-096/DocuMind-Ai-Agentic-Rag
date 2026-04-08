@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Generator
 from google.genai import Client
 import time
 
 from settings import get_settings
 
 
-class LlmClient:    
-
+class LlmClient:
     def __init__(self) -> None:
         settings = get_settings()
 
@@ -17,9 +16,14 @@ class LlmClient:
 
         self.client = Client(api_key=settings.gemini_api_key)
 
-        # 🔥 Always use cheapest model
+        # stable default model
         self.model = "gemini-2.5-flash"
-        print("USING MODEL:", self.model)
+
+        print(f"✅ LLM CLIENT INITIALIZED | MODEL = {self.model}")
+
+    # =========================================
+    # NORMAL GENERATION
+    # =========================================
     def generate(
         self,
         system_prompt: str,
@@ -27,25 +31,62 @@ class LlmClient:
         temperature: float = 0.7,
         model: Optional[str] = None,
     ) -> str:
-
-        # ✅ DO NOT MODIFY PROMPT (RAG already built it)
+        selected_model = model or self.model
         prompt = user_prompt
 
         try:
-            time.sleep(2)  # rate control
+            # light throttling
+            time.sleep(1)
 
             response = self.client.models.generate_content(
-                model=self.model,
+                model=selected_model,
                 contents=prompt,
                 config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 3000,   
-                    "top_p": 0.95,               
-                }
+                    "temperature": float(temperature),
+                    "max_output_tokens": 3000,
+                    "top_p": 0.95,
+                },
             )
 
-            return response.text.strip() if response.text else "No response"
+            text = getattr(response, "text", None)
+
+            if text and text.strip():
+                return text.strip()
+
+            return "No response generated."
 
         except Exception as e:
             print("🔥 FULL LLM ERROR:", repr(e))
-            return "⚠️ Demo mode: LLM unavailable"
+            raise
+
+    # =========================================
+    # STREAM GENERATION
+    # =========================================
+    def stream_generate(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        model: Optional[str] = None,
+    ) -> Generator[str, None, None]:
+        selected_model = model or self.model
+
+        try:
+            response_stream = self.client.models.generate_content_stream(
+                model=selected_model,
+                contents=prompt,
+                config={
+                    "temperature": float(temperature),
+                    "max_output_tokens": 3000,
+                    "top_p": 0.95,
+                },
+            )
+
+            for chunk in response_stream:
+                text = getattr(chunk, "text", None)
+
+                if text:
+                    yield text
+
+        except Exception as e:
+            print("🔥 STREAM LLM ERROR:", repr(e))
+            raise

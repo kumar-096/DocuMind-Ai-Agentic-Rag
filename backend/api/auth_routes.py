@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 import secrets
-
+import re
 from db import get_db
 from models import User, UserSession, LoginAudit
 from core.security import (
@@ -23,22 +23,27 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
+    is_production = settings.environment == "production"
 
-    
+    cookie_secure = is_production
+    cookie_samesite = "none" if is_production else "lax"
+
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=cookie_secure,
+        samesite=cookie_samesite,
+        path="/"
     )
 
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=cookie_secure,
+        samesite=cookie_samesite,
+        path="/"
     )
 
     csrf_token = secrets.token_urlsafe(32)
@@ -47,10 +52,10 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         key="csrf_token",
         value=csrf_token,
         httponly=False,
-        secure=True,
-        samesite="none"
+        secure=cookie_secure,
+        samesite=cookie_samesite,
+        path="/"
     )
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -133,19 +138,58 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
 
 
 @router.post("/signup")
-def signup(payload: SignupRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+def signup(
+    payload: SignupRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    import re
 
     ip = request.client.host
     user_agent = request.headers.get("user-agent")
 
-    existing = db.query(User).filter(User.email == payload.email).first()
+    # ✅ Gmail-only validation
+    if not payload.email.lower().endswith("@gmail.com"):
+        raise HTTPException(400, "Use a valid Gmail address")
+
+    # ✅ strong password validation
+    password = payload.password
+
+    if len(password) < 8:
+        raise HTTPException(
+            400,
+            "Password must be at least 8 characters"
+        )
+
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(
+            400,
+            "Password must include one uppercase letter"
+        )
+
+    if not re.search(r"[0-9]", password):
+        raise HTTPException(
+            400,
+            "Password must include one number"
+        )
+
+    if not re.search(r"[^A-Za-z0-9]", password):
+        raise HTTPException(
+            400,
+            "Password must include one special symbol"
+        )
+
+    existing = db.query(User).filter(
+        User.email == payload.email
+    ).first()
 
     if existing:
         raise HTTPException(400, "User already exists")
 
     user = User(
         email=payload.email,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(password),
         token_version=0
     )
 
@@ -176,7 +220,6 @@ def signup(payload: SignupRequest, request: Request, response: Response, db: Ses
     set_auth_cookies(response, access_token, refresh_token)
 
     return {"message": "Signup successful"}
-
 
 
 @router.post("/google")
@@ -290,3 +333,21 @@ def refresh_token(
     set_auth_cookies(response, new_access, new_refresh)
 
     return {"message": "refreshed"}
+@router.post("/logout")
+def logout(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db.query(UserSession).filter(
+        UserSession.user_id == current_user.id,
+        UserSession.is_active == True
+    ).update({"is_active": False})
+
+    db.commit()
+
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie("csrf_token", path="/")
+
+    return {"message": "Logged out"}

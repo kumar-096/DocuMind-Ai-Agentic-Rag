@@ -18,33 +18,45 @@ from cache import get_cache, set_cache
 # ==============================
 def build_structured_prompt(context_text: str, query: str) -> str:
     return f"""
-You are a helpful AI assistant.
+You are an expert AI teaching assistant.
 
-Use the context if relevant. If not, answer using your own knowledge.
+Generate a highly structured, visually readable markdown response.
+
+STRICT FORMAT:
 
 ## 🚀 Answer
-Provide a detailed explanation (at least 5–6 lines)
+Give a deep explanation in 2–3 rich paragraphs.
 
 ## 🧠 Key Idea
-Explain simply
+Summarize the central concept in simple words.
 
 ## 🔍 Breakdown
-- Key concept
-- How it works
-- Why it matters
+### How it works
+Explain the mechanism step by step.
+
+### Key Components
+List important parts as bullet points.
+
+### Intuition
+Give a real-world intuition or analogy.
 
 ## ⚡ Summary
-1–2 line takeaway
+Provide a crisp 1–2 sentence takeaway.
+
+RULES:
+- Always use markdown headings exactly as above
+- Use bullet points where useful
+- Separate paragraphs cleanly
+- Use inline code for formulas, variables, and symbols
+- Prefer readable sections over long walls of text
+- Never skip any section
 
 Context:
-{context_text[:300]}
+{context_text[:800]}
 
 Question:
 {query}
-IMPORTANT: Do NOT stop early. Complete all sections fully.
 """
-
-
 def should_use_rag(query: str, retrieved) -> bool:
     if not retrieved:
         return False

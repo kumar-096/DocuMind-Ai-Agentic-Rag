@@ -11,7 +11,6 @@ import {
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { motion } from "framer-motion"
-
 import { useChat } from "../context/ChatContext"
 
 type MessageRole = "user" | "assistant"
@@ -23,7 +22,6 @@ interface Message {
 }
 
 export function ChatPage() {
-
   const { sessionId, setSessionId, messages, setMessages } = useChat()
 
   const [input, setInput] = useState("")
@@ -44,34 +42,30 @@ export function ChatPage() {
 
   /* ---------------- LOAD SESSION ---------------- */
   useEffect(() => {
-
     if (!sessionId) return
 
     let cancelled = false
 
     async function loadMessages() {
       try {
-
         const stored = await loadSessionMessages(sessionId)
         if (cancelled) return
 
-        setMessages(stored.map(m => ({
-          id: String(m.id),
-          role: m.role,
-          content: m.content
-        })))
-
+        setMessages(
+          stored.map((m) => ({
+            id: String(m.id),
+            role: m.role,
+            content: m.content
+          }))
+        )
       } catch (err: any) {
-
         if (err.message === "SESSION_NOT_FOUND") {
-
           const newSession = await createSession()
 
           if (!cancelled) {
             setSessionId(newSession.id)
             setMessages([])
           }
-
           return
         }
 
@@ -80,8 +74,9 @@ export function ChatPage() {
     }
 
     loadMessages()
-    return () => { cancelled = true }
-
+    return () => {
+      cancelled = true
+    }
   }, [sessionId])
 
   /* ---------------- AUTO SCROLL ---------------- */
@@ -91,40 +86,40 @@ export function ChatPage() {
 
   /* ---------------- STREAM ENGINE ---------------- */
   useEffect(() => {
+  if (streaming.current) return
+  streaming.current = true
 
-    if (streaming.current) return
-    streaming.current = true
-
-    function process() {
-
-      if (queue.current.length === 0) {
-        if (!loading) streaming.current = false
-        else setTimeout(process, 20)
-        return
+  function process() {
+    if (queue.current.length === 0) {
+      if (!loading) {
+        streaming.current = false
+      } else {
+        setTimeout(process, 20)
       }
-
-      const next = queue.current.shift() || ""
-
-      setMessages(prev => {
-        const updated = [...prev]
-        const i = updated.findIndex(m => m.id === assistantRef.current)
-        if (i !== -1) updated[i].content += next
-        return updated
-      })
-
-      let delay = 15
-      if (next === " ") delay = 8
-      else if ([".", ",", "\n"].includes(next)) delay = 80
-      else if (/[A-Z]/.test(next)) delay = 25
-
-      delay += Math.random() * 10
-
-      setTimeout(process, delay)
+      return
     }
 
-    process()
+    const next = queue.current.shift() || ""
 
-  }, [loading])
+    setMessages((prev) => {
+      const updated = [...prev]
+      const i = updated.findIndex(
+        (m) => m.id === assistantRef.current
+      )
+
+      if (i !== -1) {
+        updated[i].content += next
+      }
+
+      return updated
+    })
+
+    // ✅ minimal UI smoothing
+    setTimeout(process, 8)
+  }
+
+  process()
+}, [loading, setMessages])
 
   /* ---------------- COPY ---------------- */
   function copy(text: string) {
@@ -140,22 +135,28 @@ export function ChatPage() {
   }
 
   function isValidToken(token: string) {
-    return !["Copy", "Stop", "Regenerate"].some(b => token.includes(b))
+    return !["Copy", "Stop", "Regenerate"].some((b) =>
+      token.includes(b)
+    )
   }
 
   /* ---------------- REGENERATE ---------------- */
   function regenerate(lastUserMessage: string) {
-
     if (loading) return
 
+    setError(null)
     setLoading(true)
 
     const assistantId = crypto.randomUUID()
     assistantRef.current = assistantId
 
-    setMessages(prev => [
+    setMessages((prev) => [
       ...prev,
-      { id: assistantId, role: "assistant", content: "" }
+      {
+        id: assistantId,
+        role: "assistant",
+        content: ""
+      }
     ])
 
     queue.current = []
@@ -164,7 +165,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: lastUserMessage,
-        session_id: (sessionId ?? 0) as number, //    FIX
+        session_id: (sessionId ?? 0) as number,
         top_k: settings?.top_k || 5
       },
       (token) => {
@@ -172,9 +173,13 @@ export function ChatPage() {
           queue.current.push(token)
         }
       },
-      () => setLoading(false),
       () => {
-        setError("Retry failed")
+        setError(null)
+        setLoading(false)
+      },
+      (err) => {
+        console.error("Regenerate error:", err)
+        setError(typeof err === "string" ? err : "Retry failed")
         setLoading(false)
       }
     )
@@ -182,7 +187,6 @@ export function ChatPage() {
 
   /* ---------------- SUBMIT ---------------- */
   async function handleSubmit(e: FormEvent) {
-
     e.preventDefault()
 
     if (!input.trim() || loading) return
@@ -203,14 +207,14 @@ export function ChatPage() {
       content: input
     }
 
-    setMessages(prev => [...prev, userMessage])
+    setMessages((prev) => [...prev, userMessage])
     setInput("")
     setLoading(true)
 
     const assistantId = crypto.randomUUID()
     assistantRef.current = assistantId
 
-    setMessages(prev => [
+    setMessages((prev) => [
       ...prev,
       { id: assistantId, role: "assistant", content: "" }
     ])
@@ -221,7 +225,7 @@ export function ChatPage() {
     askQuestionSSE(
       {
         query: userMessage.content,
-        session_id: activeSessionId as number, //    FIX
+        session_id: activeSessionId as number,
         top_k: settings?.top_k || 5
       },
       (token) => {
@@ -232,8 +236,6 @@ export function ChatPage() {
       () => setLoading(false),
       (err) => {
         console.error("Streaming error:", err)
-
-        
         setError(typeof err === "string" ? err : "Something went wrong")
         setLoading(false)
       }
@@ -248,87 +250,154 @@ export function ChatPage() {
   }
 
   return (
-
     <div className="flex h-full flex-col">
-
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-3xl space-y-6">
-
           {messages.map((m, index) => (
-
             <div key={m.id} className="group space-y-2">
-
-              <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-
+              <div
+                className={`flex ${
+                  m.role === "user"
+                    ? "justify-end"
+                    : "justify-start"
+                }`}
+              >
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`max-w-[80%] rounded-xl px-5 py-4 text-sm leading-relaxed ${
+                  className={`group relative border shadow-lg transition-all duration-300 ${
                     m.role === "user"
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-800 text-slate-50"
+                      ? "max-w-fit min-w-[80px] rounded-2xl px-4 py-2.5 bg-blue-600 text-white border-blue-500/30"
+                      : "max-w-[82%] rounded-3xl px-6 py-5 bg-slate-900 text-slate-50 border-white/10"
                   }`}
                 >
+                  {m.role === "assistant" && (
+                    <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                      <button
+                        onClick={() => copy(m.content)}
+                        className="cursor-pointer rounded-lg bg-black/30 px-2 py-1 text-xs hover:bg-black/50 flex items-center gap-1"
+                      >
+                        📋 <span>Copy</span>
+                      </button>
+                    </div>
+                  )}
 
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      code(props: any) { //    FIX (safe typing)
+                      h2: ({ children }) => (
+                        <div className="mt-8 mb-5 border-l-4 border-cyan-400 bg-cyan-500/5 px-4 py-2 rounded-r-xl">
+                          <h2 className="text-lg font-semibold tracking-wide text-cyan-300">
+                            {children}
+                          </h2>
+                        </div>
+                      ),
+
+                      h3: ({ children }) => (
+                        <h3 className="mt-7 mb-3 text-lg font-semibold text-blue-300">
+                          {children}
+                        </h3>
+                      ),
+
+                      p: ({ children }) => (
+                        <p className="my-5 leading-8 text-slate-300">
+                          {children}
+                        </p>
+                      ),
+
+                      ul: ({ children }) => (
+                        <ul className="my-5 ml-6 list-disc space-y-3">
+                          {children}
+                        </ul>
+                      ),
+
+                      ol: ({ children }) => (
+                        <ol className="my-5 ml-6 list-decimal space-y-3">
+                          {children}
+                        </ol>
+                      ),
+
+                      li: ({ children }) => (
+                        <li className="leading-7 text-slate-300">
+                          {children}
+                        </li>
+                      ),
+
+                      code(props: any) {
                         const { inline, children } = props
 
                         return inline ? (
-                          <code className="bg-slate-700 px-1 rounded">
+                          <code className="rounded-md bg-slate-800 px-2 py-1 text-emerald-400">
                             {children}
                           </code>
                         ) : (
-                          <div className="relative">
-                            <pre className="bg-black p-3 rounded overflow-x-auto">
-                              <code>{children}</code>
+                          <div className="group/code relative my-6">
+                            <pre className="overflow-x-auto rounded-2xl bg-black px-4 py-4">
+                              <code className="text-emerald-400">
+                                {children}
+                              </code>
                             </pre>
 
                             <button
-                              onClick={() => copy(String(children))}
-                              className="absolute top-2 right-2 text-xs bg-slate-700 px-2 py-1 rounded opacity-0 group-hover:opacity-100"
+                              onClick={() =>
+                                copy(String(children))
+                              }
+                              className="cursor-pointer absolute top-3 right-3 rounded-lg bg-slate-800 px-2 py-1 text-xs opacity-0 transition group-hover/code:opacity-100"
                             >
-                              Copy
+                              📋 Copy
                             </button>
                           </div>
                         )
-                      }
+                      },
+
+                      blockquote: ({ children }) => (
+                        <blockquote className="my-6 border-l-4 border-cyan-400 pl-4 italic text-slate-400">
+                          {children}
+                        </blockquote>
+                      ),
+
+                      hr: () => (
+                        <hr className="my-8 border-white/10" />
+                      )
                     }}
                   >
                     {m.content}
                   </ReactMarkdown>
-
                 </motion.div>
-
               </div>
 
               {m.role === "assistant" && (
-                <div className="flex gap-3 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
-
-                  <button onClick={() => copy(m.content)} className="hover:text-white">
-                    Copy
+                <div className="flex gap-4 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
+                  <button
+                    onClick={() => copy(m.content)}
+                    className="cursor-pointer hover:text-white flex items-center gap-1"
+                  >
+                    📋 <span>Copy</span>
                   </button>
 
-                  <button onClick={stopGeneration} className="hover:text-red-400">
-                    Stop
+                  <button
+                    onClick={stopGeneration}
+                    className="cursor-pointer hover:text-red-400 flex items-center gap-1"
+                  >
+                    ⏹ <span>Stop</span>
                   </button>
 
-                  {index > 0 && messages[index - 1].role === "user" && (
-                    <button
-                      onClick={() => regenerate(messages[index - 1].content)}
-                      className="hover:text-yellow-400"
-                    >
-                      Regenerate
-                    </button>
-                  )}
-
+                  {index > 0 &&
+                    messages[index - 1].role === "user" && (
+                      <button
+                        onClick={() =>
+                          regenerate(
+                            messages[index - 1].content
+                          )
+                        }
+                        className="cursor-pointer hover:text-yellow-400 flex items-center gap-1"
+                      >
+                        🔄 <span>Regenerate</span>
+                      </button>
+                    )}
                 </div>
               )}
-
             </div>
-
           ))}
 
           {loading && (
@@ -344,14 +413,14 @@ export function ChatPage() {
           )}
 
           <div ref={messagesEndRef} />
-
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="sticky bottom-0 p-4 bg-slate-950 border-t">
-
+      <form
+        onSubmit={handleSubmit}
+        className="sticky bottom-0 p-4 bg-slate-950 border-t"
+      >
         <div className="max-w-3xl mx-auto flex gap-3">
-
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -363,15 +432,12 @@ export function ChatPage() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-blue-600 px-5 rounded-lg text-white hover:bg-blue-500 transition"
+            className="cursor-pointer bg-blue-600 px-5 rounded-lg text-white hover:bg-blue-500 transition"
           >
             Send
           </button>
-
         </div>
-
       </form>
-
     </div>
   )
 }

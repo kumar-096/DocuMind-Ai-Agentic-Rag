@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react"
+import { fetchWithAuth } from "../lib/api"
 
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
@@ -12,18 +13,18 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-
+export function AuthProvider({
+  children
+}: {
+  children: React.ReactNode
+}) {
   const [isAuthenticated, setAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
 
   async function checkAuth() {
     try {
-      const res = await fetch(
-        `${BASE_URL}/api/auth/me`,
-        {
-          credentials: "include"
-        }
+      const res = await fetchWithAuth(
+        `${BASE_URL}/api/auth/me`
       )
 
       if (res.status === 401) {
@@ -36,7 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setAuthenticated(true)
-
     } catch (err) {
       console.error("Auth check error:", err)
       setAuthenticated(false)
@@ -44,18 +44,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
+    const confirmLogout = window.confirm(
+      "Are you sure you want to logout?"
+    )
 
-    const confirmLogout = window.confirm("Are you sure you want to logout?")
     if (!confirmLogout) return
 
     try {
-      await fetch(
-        `${BASE_URL}/api/auth/logout`,
-        {
-          method: "POST",
-          credentials: "include"
-        }
-      )
+      await fetch(`${BASE_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include"
+      })
     } catch (err) {
       console.error("Logout failed:", err)
     }
@@ -72,7 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, loading, checkAuth, logout }}
+      value={{
+        isAuthenticated,
+        loading,
+        checkAuth,
+        logout
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -80,7 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuth() {
-
   const ctx = useContext(AuthContext)
 
   if (!ctx) {

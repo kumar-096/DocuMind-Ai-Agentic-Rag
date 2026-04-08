@@ -16,7 +16,6 @@ type SidebarProps = {
 }
 
 export function Sidebar({ page, setPage }: SidebarProps) {
-
   const { messages, setMessages, setSessionId } = useChat()
   const { logout } = useAuth()
 
@@ -46,7 +45,6 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
       const data = await res.json()
       setSessions(data)
-
     } catch (err) {
       console.error("Fetch failed:", err)
     }
@@ -82,7 +80,6 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
       await loadSessions()
       setPage("chat")
-
     } catch (err) {
       console.error(err)
     }
@@ -131,7 +128,6 @@ export function Sidebar({ page, setPage }: SidebarProps) {
       setRenameId(null)
       setRenameValue("")
       loadSessions(search)
-
     } catch (err) {
       console.error(err)
     }
@@ -154,9 +150,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
     .slice(-5)
 
   return (
-
-    <aside className="w-64 border-r border-slate-800 bg-slate-950 flex flex-col">
-
+    <aside className="w-72 border-r border-slate-800 bg-slate-950 flex flex-col">
       {/* MODALS */}
       <ConfirmModal
         open={showLogoutModal}
@@ -189,10 +183,15 @@ export function Sidebar({ page, setPage }: SidebarProps) {
       />
 
       {/* HEADER */}
-      <div className="mb-6 flex items-center justify-center gap-2 text-white text-lg font-semibold tracking-wide">
-        <span className="text-xl">🧠</span>
-        <span>DocuMind</span>
-        <span className="text-blue-400 text-sm">AI</span>
+      <div className="px-4 pt-6 pb-4 border-b border-slate-800">
+        <div className="flex items-center gap-2 text-white text-lg font-semibold tracking-wide">
+          <span className="text-xl">🧠</span>
+          <span>DocuMind</span>
+          <span className="text-blue-400 text-sm">AI</span>
+        </div>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Conversational knowledge workspace
+        </p>
       </div>
 
       {/* SEARCH */}
@@ -201,7 +200,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats..."
-          className="w-full bg-slate-900 px-2 py-2 text-xs rounded outline-none text-white"
+          className="w-full bg-slate-900 px-3 py-2 text-xs rounded-lg outline-none text-white border border-slate-800 focus:border-blue-500 transition"
         />
       </div>
 
@@ -216,25 +215,22 @@ export function Sidebar({ page, setPage }: SidebarProps) {
       </div>
 
       {/* NEW CHAT */}
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-3">
         <button
           onClick={handleNewChat}
-          className="w-full bg-blue-600 py-2 rounded text-sm hover:bg-blue-500 transition cursor-pointer"
+          className="w-full bg-blue-600 py-2.5 rounded-lg text-sm hover:bg-blue-500 transition cursor-pointer"
         >
           + New Chat
         </button>
       </div>
 
       {/* SESSIONS */}
-      <div className="px-3 overflow-y-auto space-y-1">
-
+      <div className="flex-1 px-3 overflow-y-auto space-y-1 custom-scroll">
         {sessions.map((s: any) => (
-
           <div
             key={s.id}
-            className="group relative flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 transition cursor-pointer"
+            className="group relative flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-900 transition cursor-pointer"
           >
-
             <div
               onClick={() => {
                 setSessionId(s.id)
@@ -245,15 +241,13 @@ export function Sidebar({ page, setPage }: SidebarProps) {
               {s.title}
             </div>
 
-            {/* PIN */}
             <button
               onClick={() => togglePin(s.id)}
-              className="text-yellow-400 text-xs mr-1 cursor-pointer"
+              className="text-yellow-400 text-xs mr-2 cursor-pointer"
             >
               {s.is_pinned ? "★" : "☆"}
             </button>
 
-            {/* MENU */}
             <div
               onClick={() => setMenuOpen(menuOpen === s.id ? null : s.id)}
               className="opacity-0 group-hover:opacity-100 cursor-pointer"
@@ -261,10 +255,8 @@ export function Sidebar({ page, setPage }: SidebarProps) {
               ⋮
             </div>
 
-            {/* DROPDOWN */}
             {menuOpen === s.id && (
-              <div className="absolute right-0 top-6 bg-slate-900 border border-slate-700 rounded w-28 z-50 shadow">
-
+              <div className="absolute right-0 top-8 bg-slate-900 border border-slate-700 rounded-lg w-28 z-50 shadow-lg">
                 <button
                   onClick={() => {
                     setRenameId(s.id)
@@ -296,50 +288,49 @@ export function Sidebar({ page, setPage }: SidebarProps) {
                 >
                   Delete
                 </button>
-
               </div>
             )}
-
           </div>
-
         ))}
-
       </div>
 
       {/* RECENT */}
       <div className="px-3 mt-4">
-        <p className="text-xs text-slate-500 mb-2">Recent</p>
-        {recent.map((m) => (
-          <div key={m.id} className="text-xs text-slate-400 truncate">
-            {m.content}
-          </div>
-        ))}
+        <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
+          Recent Prompts
+        </p>
+
+        <div className="space-y-2">
+          {recent.map((m) => (
+            <div
+              key={m.id}
+              className="rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-300 truncate hover:bg-slate-800 transition cursor-pointer"
+            >
+              {m.content}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* NAV */}
       <nav className="flex flex-col gap-1 p-3 mt-4">
-
         <button
           onClick={() => setPage("documents")}
-          className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer"
+          className="text-left px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer"
         >
           Documents
         </button>
 
         <button
           onClick={() => setPage("settings")}
-          className="text-left px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer"
+          className="text-left px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer"
         >
           Settings
         </button>
-
       </nav>
 
       {/* LOGOUT */}
-      <div className="mt-auto">
-
-        <div className="border-t border-slate-700"></div>
-
+      <div className="mt-auto border-t border-slate-800">
         <div className="p-4">
           <button
             onClick={() => setShowLogoutModal(true)}
@@ -348,9 +339,7 @@ export function Sidebar({ page, setPage }: SidebarProps) {
             Logout
           </button>
         </div>
-
       </div>
-
     </aside>
   )
 }

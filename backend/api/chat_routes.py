@@ -101,8 +101,8 @@ async def ask_chat(
                             await asyncio.sleep(0)  # force flush
 
                 except Exception as e:
-                    print("STREAM ERROR:", str(e))
-
+                    import traceback
+                    traceback.print_exc()
                     fallback = "⚠️ Unable to generate response."
                     full_answer = fallback
 
