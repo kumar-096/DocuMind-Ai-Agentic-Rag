@@ -224,7 +224,7 @@ export function askQuestionSSE(
 ) { 
   console.log("🌐 askQuestionSSE called", payload)
   currentController = new AbortController()
-  let completed = false   // ✅ prevent duplicate onDone
+  let completed = false   //  prevent duplicate onDone
 
   fetch(`${BASE_URL}/api/chat/ask`, {
     method: "POST",
@@ -316,20 +316,27 @@ export function askQuestionSSE(
 ===================================================== */
 
 export async function createSession(): Promise<ChatSession> {
-  const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/`, { method: "POST" })
+  const res = await fetchWithAuth(`${BASE_URL}/api/sessions/`, {
+    method: "POST"
+  })
+
   if (!res.ok) throw new Error("Failed to create session")
+
   return res.json()
 }
 
 export async function listSessions(): Promise<ChatSession[]> {
-  const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/`)
+  const res = await fetchWithAuth(`${BASE_URL}/api/sessions/`)
+
   if (!res.ok) throw new Error("Failed to load sessions")
+
   return res.json()
 }
 
-export async function loadSessionMessages(sessionId: number): Promise<StoredMessage[]> {
-
-  const res = await fetchWithTimeout(
+export async function loadSessionMessages(
+  sessionId: number
+): Promise<StoredMessage[]> {
+  const res = await fetchWithAuth(
     `${BASE_URL}/api/sessions/${sessionId}/messages`
   )
 
@@ -345,12 +352,15 @@ export async function loadSessionMessages(sessionId: number): Promise<StoredMess
 }
 
 export async function deleteSession(id: number) {
-  const res = await fetchWithTimeout(`${BASE_URL}/api/sessions/${id}`, {
-    method: "DELETE"
-  })
+  const res = await fetchWithAuth(
+    `${BASE_URL}/api/sessions/${id}`,
+    {
+      method: "DELETE"
+    }
+  )
+
   if (!res.ok) throw new Error("Failed to delete session")
 }
-
 /* =====================================================
    AUTH FETCH FIX
 ===================================================== */

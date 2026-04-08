@@ -19,7 +19,7 @@ class LlmClient:
         # stable default model
         self.model = "gemini-2.5-flash"
 
-        print(f"✅ LLM CLIENT INITIALIZED | MODEL = {self.model}")
+        print(f" LLM CLIENT INITIALIZED | MODEL = {self.model}")
 
     # =========================================
     # NORMAL GENERATION
@@ -36,7 +36,7 @@ class LlmClient:
 
         try:
             # light throttling
-            time.sleep(1)
+            time.sleep(0.2)
 
             response = self.client.models.generate_content(
                 model=selected_model,
@@ -56,7 +56,7 @@ class LlmClient:
             return "No response generated."
 
         except Exception as e:
-            print("🔥 FULL LLM ERROR:", repr(e))
+            print(" FULL LLM ERROR:", repr(e))
             raise
 
     # =========================================
@@ -88,5 +88,5 @@ class LlmClient:
                     yield text
 
         except Exception as e:
-            print("🔥 STREAM LLM ERROR:", repr(e))
+            print(" STREAM LLM ERROR:", repr(e))
             raise

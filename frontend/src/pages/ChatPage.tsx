@@ -114,7 +114,7 @@ export function ChatPage() {
       return updated
     })
 
-    // ✅ minimal UI smoothing
+    //  minimal UI smoothing
     setTimeout(process, 8)
   }
 
@@ -250,194 +250,184 @@ export function ChatPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto max-w-3xl space-y-6">
-          {messages.map((m, index) => (
-            <div key={m.id} className="group space-y-2">
-              <div
-                className={`flex ${
+  <div className="flex h-full flex-col">
+    <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="mx-auto max-w-3xl space-y-6">
+        {messages.map((m, index) => (
+          <div key={m.id} className="group space-y-2">
+            <div
+              className={`flex ${
+                m.role === "user"
+                  ? "justify-end"
+                  : "justify-start"
+              }`}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`group relative border shadow-lg transition-all duration-300 ${
                   m.role === "user"
-                    ? "justify-end"
-                    : "justify-start"
+                    ? "max-w-fit min-w-[80px] rounded-2xl px-4 py-2.5 bg-blue-600 text-white border-blue-500/30"
+                    : "max-w-[82%] rounded-3xl px-6 pt-12 pb-5 bg-slate-900 text-slate-50 border-white/10"
                 }`}
               >
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`group relative border shadow-lg transition-all duration-300 ${
-                    m.role === "user"
-                      ? "max-w-fit min-w-[80px] rounded-2xl px-4 py-2.5 bg-blue-600 text-white border-blue-500/30"
-                      : "max-w-[82%] rounded-3xl px-6 py-5 bg-slate-900 text-slate-50 border-white/10"
-                  }`}
-                >
-                  {m.role === "assistant" && (
-                    <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                      <button
-                        onClick={() => copy(m.content)}
-                        className="cursor-pointer rounded-lg bg-black/30 px-2 py-1 text-xs hover:bg-black/50 flex items-center gap-1"
-                      >
-                        📋 <span>Copy</span>
-                      </button>
-                    </div>
-                  )}
+                {m.role === "assistant" && (
+                  <div className="absolute top-3 right-3 flex gap-2 z-20">
+                    <button
+                      onClick={() => copy(m.content)}
+                      className="cursor-pointer rounded-lg bg-black/40 px-2 py-1 text-xs hover:bg-black/60"
+                    >
+                      Copy
+                    </button>
 
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      h2: ({ children }) => (
-                        <div className="mt-8 mb-5 border-l-4 border-cyan-400 bg-cyan-500/5 px-4 py-2 rounded-r-xl">
-                          <h2 className="text-lg font-semibold tracking-wide text-cyan-300">
-                            {children}
-                          </h2>
+                    {loading &&
+                    m.id === assistantRef.current &&
+                    m.content.trim().length > 0 ? (
+                      <button
+                        onClick={stopGeneration}
+                        className="cursor-pointer rounded-lg bg-red-600/70 px-2 py-1 text-xs hover:bg-red-600"
+                      >
+                        Stop
+                      </button>
+                    ) : null}
+
+                    {!loading &&
+                      index > 0 &&
+                      messages[index - 1].role === "user" && (
+                        <button
+                          onClick={() =>
+                            regenerate(messages[index - 1].content)
+                          }
+                          className="cursor-pointer rounded-lg bg-yellow-600/70 px-2 py-1 text-xs hover:bg-yellow-600"
+                        >
+                          Retry
+                        </button>
+                      )}
+                  </div>
+                )}
+
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h2: ({ children }) => (
+                      <div className="mt-8 mb-5 border-l-4 border-cyan-400 bg-cyan-500/5 px-4 py-2 rounded-r-xl">
+                        <h2 className="text-lg font-semibold tracking-wide text-cyan-300">
+                          {children}
+                        </h2>
+                      </div>
+                    ),
+
+                    h3: ({ children }) => (
+                      <h3 className="mt-7 mb-3 text-lg font-semibold text-blue-300">
+                        {children}
+                      </h3>
+                    ),
+
+                    p: ({ children }) => (
+                      <p className="my-5 leading-8 text-slate-300">
+                        {children}
+                      </p>
+                    ),
+
+                    ul: ({ children }) => (
+                      <ul className="my-5 ml-6 list-disc space-y-3">
+                        {children}
+                      </ul>
+                    ),
+
+                    ol: ({ children }) => (
+                      <ol className="my-5 ml-6 list-decimal space-y-3">
+                        {children}
+                      </ol>
+                    ),
+
+                    li: ({ children }) => (
+                      <li className="leading-7 text-slate-300">
+                        {children}
+                      </li>
+                    ),
+
+                    code(props: any) {
+                      const { inline, children } = props
+
+                      return inline ? (
+                        <code className="rounded-md bg-slate-800 px-2 py-1 text-emerald-400">
+                          {children}
+                        </code>
+                      ) : (
+                        <div className="group/code relative my-6">
+                          <pre className="overflow-x-auto rounded-2xl bg-black px-4 py-4">
+                            <code className="text-emerald-400">
+                              {children}
+                            </code>
+                          </pre>
+
+                          <button
+                            onClick={() => copy(String(children))}
+                            className="cursor-pointer absolute top-3 right-3 rounded-lg bg-slate-800 px-2 py-1 text-xs opacity-0 transition group-hover/code:opacity-100"
+                          >
+                            Copy
+                          </button>
                         </div>
-                      ),
-
-                      h3: ({ children }) => (
-                        <h3 className="mt-7 mb-3 text-lg font-semibold text-blue-300">
-                          {children}
-                        </h3>
-                      ),
-
-                      p: ({ children }) => (
-                        <p className="my-5 leading-8 text-slate-300">
-                          {children}
-                        </p>
-                      ),
-
-                      ul: ({ children }) => (
-                        <ul className="my-5 ml-6 list-disc space-y-3">
-                          {children}
-                        </ul>
-                      ),
-
-                      ol: ({ children }) => (
-                        <ol className="my-5 ml-6 list-decimal space-y-3">
-                          {children}
-                        </ol>
-                      ),
-
-                      li: ({ children }) => (
-                        <li className="leading-7 text-slate-300">
-                          {children}
-                        </li>
-                      ),
-
-                      code(props: any) {
-                        const { inline, children } = props
-
-                        return inline ? (
-                          <code className="rounded-md bg-slate-800 px-2 py-1 text-emerald-400">
-                            {children}
-                          </code>
-                        ) : (
-                          <div className="group/code relative my-6">
-                            <pre className="overflow-x-auto rounded-2xl bg-black px-4 py-4">
-                              <code className="text-emerald-400">
-                                {children}
-                              </code>
-                            </pre>
-
-                            <button
-                              onClick={() =>
-                                copy(String(children))
-                              }
-                              className="cursor-pointer absolute top-3 right-3 rounded-lg bg-slate-800 px-2 py-1 text-xs opacity-0 transition group-hover/code:opacity-100"
-                            >
-                              📋 Copy
-                            </button>
-                          </div>
-                        )
-                      },
-
-                      blockquote: ({ children }) => (
-                        <blockquote className="my-6 border-l-4 border-cyan-400 pl-4 italic text-slate-400">
-                          {children}
-                        </blockquote>
-                      ),
-
-                      hr: () => (
-                        <hr className="my-8 border-white/10" />
                       )
-                    }}
-                  >
-                    {m.content}
-                  </ReactMarkdown>
-                </motion.div>
-              </div>
+                    },
 
-              {m.role === "assistant" && (
-                <div className="flex gap-4 text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
-                  <button
-                    onClick={() => copy(m.content)}
-                    className="cursor-pointer hover:text-white flex items-center gap-1"
-                  >
-                    📋 <span>Copy</span>
-                  </button>
+                    blockquote: ({ children }) => (
+                      <blockquote className="my-6 border-l-4 border-cyan-400 pl-4 italic text-slate-400">
+                        {children}
+                      </blockquote>
+                    ),
 
-                  <button
-                    onClick={stopGeneration}
-                    className="cursor-pointer hover:text-red-400 flex items-center gap-1"
-                  >
-                    ⏹ <span>Stop</span>
-                  </button>
-
-                  {index > 0 &&
-                    messages[index - 1].role === "user" && (
-                      <button
-                        onClick={() =>
-                          regenerate(
-                            messages[index - 1].content
-                          )
-                        }
-                        className="cursor-pointer hover:text-yellow-400 flex items-center gap-1"
-                      >
-                        🔄 <span>Regenerate</span>
-                      </button>
-                    )}
-                </div>
-              )}
+                    hr: () => (
+                      <hr className="my-8 border-white/10" />
+                    )
+                  }}
+                >
+                  {m.content}
+                </ReactMarkdown>
+              </motion.div>
             </div>
-          ))}
+          </div>
+        ))}
 
-          {loading && (
-            <div className="text-sm text-slate-400 animate-pulse">
-              Thinking...
-            </div>
-          )}
+        {loading && (
+          <div className="text-sm text-slate-400 animate-pulse">
+            Thinking...
+          </div>
+        )}
 
-          {error && (
-            <div className="text-yellow-400 text-sm bg-yellow-900/20 p-2 rounded">
-              ⚠️ {error}
-            </div>
-          )}
+        {error && (
+          <div className="text-yellow-400 text-sm bg-yellow-900/20 p-2 rounded">
+            {error}
+          </div>
+        )}
 
-          <div ref={messagesEndRef} />
-        </div>
+        <div ref={messagesEndRef} />
       </div>
-
-      <form
-        onSubmit={handleSubmit}
-        className="sticky bottom-0 p-4 bg-slate-950 border-t"
-      >
-        <div className="max-w-3xl mx-auto flex gap-3">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-            placeholder="Ask..."
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="cursor-pointer bg-blue-600 px-5 rounded-lg text-white hover:bg-blue-500 transition"
-          >
-            Send
-          </button>
-        </div>
-      </form>
     </div>
-  )
+
+    <form
+      onSubmit={handleSubmit}
+      className="sticky bottom-0 p-4 bg-slate-950 border-t"
+    >
+      <div className="max-w-3xl mx-auto flex gap-3">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+          placeholder="Ask..."
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="cursor-pointer bg-blue-600 px-5 rounded-lg text-white hover:bg-blue-500 transition"
+        >
+          Send
+        </button>
+      </div>
+    </form>
+  </div>
+)
 }

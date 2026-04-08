@@ -20,7 +20,7 @@ def on_startup():
 
 
 # ==============================
-# 🔥 RATE LIMIT
+#  RATE LIMIT
 # ==============================
 last_request_time = {}
 
@@ -69,7 +69,7 @@ async def ask_chat(
     async def event_stream():
         full_answer = ""
 
-        # 🔥 Initial ping (important for frontend)
+        #  Initial ping (important for frontend)
         yield "data: {}\n\n"
 
         try:
@@ -95,7 +95,7 @@ async def ask_chat(
                         if token:
                             full_answer += token
 
-                            # 🔥 CRITICAL: flush each chunk properly
+                            #  CRITICAL: flush each chunk properly
                             yield f"data: {json.dumps({'token': token})}\n\n"
 
                             await asyncio.sleep(0)  # force flush
@@ -138,7 +138,7 @@ async def ask_chat(
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         finally:
-            # 🔥 SAVE RESPONSE
+            #  SAVE RESPONSE
             try:
                 db.add(ChatMessage(
                     session_id=payload.session_id,
@@ -149,7 +149,7 @@ async def ask_chat(
             except Exception as e:
                 print("DB SAVE ERROR:", str(e))
 
-            # 🔥 FINAL SIGNAL (MANDATORY)
+            #  FINAL SIGNAL (MANDATORY)
             yield f"data: {json.dumps({'done': True})}\n\n"
 
     return StreamingResponse(

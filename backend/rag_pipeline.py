@@ -61,7 +61,7 @@ def should_use_rag(query: str, retrieved) -> bool:
     if not retrieved:
         return False
 
-    # 🔥 remove short / useless words
+    #  remove short / useless words
     query_words = [w for w in query.lower().split() if len(w) > 4]
 
     if not query_words:
@@ -73,7 +73,7 @@ def should_use_rag(query: str, retrieved) -> bool:
 
     print("DEBUG → OVERLAP:", overlap)
 
-    # 🔥 STRICT condition (main fix)
+    #  STRICT condition (main fix)
     return overlap >= 2
 
 
@@ -133,7 +133,7 @@ class RagPipeline:
 
         latency_ms = int((perf_counter() - start) * 1000)
 
-        # 🔥 SMART DECISION
+        #  SMART DECISION
         use_rag = should_use_rag(query, retrieved)
 
         print("USE_RAG:", use_rag)

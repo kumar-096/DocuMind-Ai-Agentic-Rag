@@ -25,12 +25,10 @@ def create_app() -> FastAPI:
         debug=settings.debug,
     )
 
-    # ✅ use centralized settings origins
+    #  use centralized settings origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_allow_origins + [
-            "https://documind-ai-five.vercel.app"
-        ],
+        allow_origins=settings.cors_allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -42,7 +40,7 @@ def create_app() -> FastAPI:
 
         try:
             Base.metadata.create_all(bind=engine)
-            print("✅ Database connected successfully")
+            print(" Database connected successfully")
 
         except Exception as e:
             print("⚠️ Database failed — running WITHOUT DB")

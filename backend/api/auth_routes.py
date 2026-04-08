@@ -149,11 +149,11 @@ def signup(
     ip = request.client.host
     user_agent = request.headers.get("user-agent")
 
-    # ✅ Gmail-only validation
+    #  Gmail-only validation
     if not payload.email.lower().endswith("@gmail.com"):
         raise HTTPException(400, "Use a valid Gmail address")
 
-    # ✅ strong password validation
+    #  strong password validation
     password = payload.password
 
     if len(password) < 8:
