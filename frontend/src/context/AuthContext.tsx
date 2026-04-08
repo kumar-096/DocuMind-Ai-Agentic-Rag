@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode
+} from "react"
 import { fetchWithAuth } from "../lib/api"
 
 const BASE_URL =
@@ -7,43 +13,49 @@ const BASE_URL =
 type AuthContextType = {
   isAuthenticated: boolean
   loading: boolean
-  checkAuth: () => Promise<void>
+  checkAuth: () => Promise<boolean>
   logout: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | null>(null)
+const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+)
+
+type AuthProviderProps = {
+  children: ReactNode
+}
 
 export function AuthProvider({
   children
-}: {
-  children: React.ReactNode
-}) {
+}: AuthProviderProps) {
   const [isAuthenticated, setAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  async function checkAuth() {
+  async function checkAuth(): Promise<boolean> {
+    setLoading(true)
+
     try {
       const res = await fetchWithAuth(
         `${BASE_URL}/api/auth/me`
       )
 
-      if (res.status === 401) {
-        setAuthenticated(false)
-        return
-      }
-
       if (!res.ok) {
-        throw new Error("Auth failed")
+        setAuthenticated(false)
+        return false
       }
 
       setAuthenticated(true)
+      return true
     } catch (err) {
       console.error("Auth check error:", err)
       setAuthenticated(false)
+      return false
+    } finally {
+      setLoading(false)
     }
   }
 
-  async function logout() {
+  async function logout(): Promise<void> {
     const confirmLogout = window.confirm(
       "Are you sure you want to logout?"
     )
@@ -57,16 +69,14 @@ export function AuthProvider({
       })
     } catch (err) {
       console.error("Logout failed:", err)
+    } finally {
+      localStorage.removeItem("active_chat_session")
+      setAuthenticated(false)
     }
-
-    localStorage.removeItem("active_chat_session")
-    setAuthenticated(false)
   }
 
   useEffect(() => {
-    checkAuth().finally(() => {
-      setLoading(false)
-    })
+    checkAuth()
   }, [])
 
   return (
@@ -83,11 +93,13 @@ export function AuthProvider({
   )
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext)
 
-  if (!ctx) {
-    throw new Error("AuthContext missing")
+  if (ctx === undefined) {
+    throw new Error(
+      "useAuth must be used inside AuthProvider"
+    )
   }
 
   return ctx

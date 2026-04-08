@@ -30,3 +30,4 @@ temp/
 frontend/temp/
 backend/documents/
 *.index
+frontend/.env.production

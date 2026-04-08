@@ -1,10 +1,15 @@
 import { useState } from "react"
 import { GoogleLogin } from "@react-oauth/google"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../../context/AuthContext"
 
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 
 export function LoginPage() {
+  const navigate = useNavigate()
+  const { checkAuth } = useAuth()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -22,12 +27,10 @@ export function LoginPage() {
 
   function getPasswordStrength(password: string) {
     let score = 0
-
     if (password.length >= 8) score++
     if (/[A-Z]/.test(password)) score++
     if (/[0-9]/.test(password)) score++
     if (/[^A-Za-z0-9]/.test(password)) score++
-
     return score
   }
 
@@ -36,6 +39,16 @@ export function LoginPage() {
     if (score === 2) return "Medium"
     if (score === 3) return "Strong"
     return "Very Strong"
+  }
+
+  async function completeAuthFlow() {
+    const ok = await checkAuth()
+
+    if (ok) {
+      navigate("/")
+    } else {
+      setError("Session setup failed")
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,7 +69,6 @@ export function LoginPage() {
         }
 
         const strength = getPasswordStrength(password)
-
         if (strength < 3) {
           setError(
             "Password too weak (uppercase, number, symbol, 8+ chars)"
@@ -84,7 +96,7 @@ export function LoginPage() {
         return
       }
 
-      window.location.href = "/"
+      await completeAuthFlow()
     } catch (err) {
       console.error(err)
       setError("Something went wrong")
@@ -114,7 +126,7 @@ export function LoginPage() {
         return
       }
 
-      window.location.href = "/"
+      await completeAuthFlow()
     } catch (err) {
       console.error(err)
       setError("Google error")
@@ -178,7 +190,9 @@ export function LoginPage() {
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="Confirm Password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) =>
+                  setConfirmPassword(e.target.value)
+                }
                 className="w-full p-2 pr-10 rounded bg-slate-800 text-white"
               />
 
@@ -195,7 +209,7 @@ export function LoginPage() {
 
           <button
             disabled={loading}
-            className="w-full bg-blue-600 py-2 rounded text-white"
+            className="w-full bg-blue-600 py-2 rounded text-white cursor-pointer"
           >
             {loading
               ? "Processing..."
@@ -207,7 +221,7 @@ export function LoginPage() {
 
         <button
           onClick={() => setIsSignup(!isSignup)}
-          className="text-sm text-blue-400 w-full"
+          className="text-sm text-blue-400 w-full cursor-pointer"
         >
           {isSignup
             ? "Already have an account? Login"
@@ -218,7 +232,7 @@ export function LoginPage() {
           OR
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex justify-center cursor-pointer">
           <GoogleLogin
             onSuccess={(res) => handleGoogleLogin(res.credential)}
             onError={() => setError("Google failed")}

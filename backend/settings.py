@@ -4,7 +4,6 @@ from pydantic import Field
 
 
 class Settings(BaseSettings):
-
     app_name: str = "Agentic RAG Backend"
     environment: str = "development"
     debug: bool = False
@@ -13,7 +12,7 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "https://documind-ai-five.vercel.app"
+            "https://documind-ai-five.vercel.app",
         ]
     )
 
@@ -21,6 +20,7 @@ class Settings(BaseSettings):
     secret_key: str
     access_token_expire_minutes: int = 60 * 24
     google_client_id: str
+
     # Gemini
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
@@ -31,6 +31,10 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() == "production"
 
     class Config:
         env_file = ".env"

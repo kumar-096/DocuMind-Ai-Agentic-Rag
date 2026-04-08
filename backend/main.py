@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from api import api_router
 from api.chat_routes import router as chat_router
@@ -25,7 +26,10 @@ def create_app() -> FastAPI:
         debug=settings.debug,
     )
 
-    #  use centralized settings origins
+    # CRITICAL: trust Render/Vercel proxy forwarded headers
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+    # centralized CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allow_origins,
@@ -40,7 +44,9 @@ def create_app() -> FastAPI:
 
         try:
             Base.metadata.create_all(bind=engine)
-            print(" Database connected successfully")
+            print("✅ Database connected successfully")
+            print("✅ Allowed origins:", settings.cors_allow_origins)
+            print("✅ Environment:", settings.environment)
 
         except Exception as e:
             print("⚠️ Database failed — running WITHOUT DB")
@@ -51,7 +57,6 @@ def create_app() -> FastAPI:
 
     # feature routers
     app.include_router(session_router)
-    print("AUTH ROUTER LOADED:", auth_router.routes)
     app.include_router(auth_router)
     app.include_router(chat_router)
     app.include_router(settings_router)

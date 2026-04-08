@@ -33,15 +33,29 @@ settings = get_settings()
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
+def _get_cookie_security(request: Request):
+    """
+    Detect real transport security safely behind proxies like Render.
+    """
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+
+    cookie_secure = (
+        forwarded_proto == "https"
+        or request.url.scheme == "https"
+    )
+
+    cookie_samesite = "none" if cookie_secure else "lax"
+
+    return cookie_secure, cookie_samesite
+
+
 def set_auth_cookies(
+    request: Request,
     response: Response,
     access_token: str,
     refresh_token: str,
 ):
-    is_production = settings.environment == "production"
-
-    cookie_secure = is_production
-    cookie_samesite = "none" if is_production else "lax"
+    cookie_secure, cookie_samesite = _get_cookie_security(request)
 
     common = {
         "httponly": True,
@@ -75,25 +89,30 @@ def set_auth_cookies(
     )
 
 
-def clear_auth_cookies(response: Response):
-    is_production = settings.environment == "production"
-    cookie_samesite = "none" if is_production else "lax"
+def clear_auth_cookies(
+    request: Request,
+    response: Response,
+):
+    cookie_secure, cookie_samesite = _get_cookie_security(request)
 
     response.delete_cookie(
         "access_token",
         path="/",
+        secure=cookie_secure,
         samesite=cookie_samesite,
     )
 
     response.delete_cookie(
         "refresh_token",
         path="/",
+        secure=cookie_secure,
         samesite=cookie_samesite,
     )
 
     response.delete_cookie(
         "csrf_token",
         path="/",
+        secure=cookie_secure,
         samesite=cookie_samesite,
     )
 
@@ -162,7 +181,7 @@ def login(
         }
     )
 
-    refresh_token = create_refresh_token(
+    refresh_token_value = create_refresh_token(
         {
             "sub": str(user.id),
             "token_version": user.token_version,
@@ -171,7 +190,7 @@ def login(
 
     session = UserSession(
         user_id=user.id,
-        refresh_token_hash=hash_token(refresh_token),
+        refresh_token_hash=hash_token(refresh_token_value),
         ip_address=ip,
         user_agent=user_agent,
     )
@@ -179,7 +198,12 @@ def login(
     db.add(session)
     db.commit()
 
-    set_auth_cookies(response, access_token, refresh_token)
+    set_auth_cookies(
+        request,
+        response,
+        access_token,
+        refresh_token_value,
+    )
 
     return {"message": "Login successful"}
 
@@ -233,7 +257,7 @@ def signup(
         }
     )
 
-    refresh_token = create_refresh_token(
+    refresh_token_value = create_refresh_token(
         {
             "sub": str(user.id),
             "token_version": user.token_version,
@@ -242,7 +266,7 @@ def signup(
 
     session = UserSession(
         user_id=user.id,
-        refresh_token_hash=hash_token(refresh_token),
+        refresh_token_hash=hash_token(refresh_token_value),
         ip_address=ip,
         user_agent=user_agent,
     )
@@ -250,7 +274,12 @@ def signup(
     db.add(session)
     db.commit()
 
-    set_auth_cookies(response, access_token, refresh_token)
+    set_auth_cookies(
+        request,
+        response,
+        access_token,
+        refresh_token_value,
+    )
 
     return {"message": "Signup successful"}
 
@@ -291,7 +320,7 @@ def google_login(
         }
     )
 
-    refresh_token = create_refresh_token(
+    refresh_token_value = create_refresh_token(
         {
             "sub": str(user.id),
             "token_version": user.token_version,
@@ -300,7 +329,7 @@ def google_login(
 
     session = UserSession(
         user_id=user.id,
-        refresh_token_hash=hash_token(refresh_token),
+        refresh_token_hash=hash_token(refresh_token_value),
         ip_address=ip,
         user_agent=user_agent,
     )
@@ -308,7 +337,12 @@ def google_login(
     db.add(session)
     db.commit()
 
-    set_auth_cookies(response, access_token, refresh_token)
+    set_auth_cookies(
+        request,
+        response,
+        access_token,
+        refresh_token_value,
+    )
 
     return {"message": "Google login successful"}
 
@@ -323,6 +357,7 @@ def me(current_user: User = Depends(get_current_user)):
 
 @router.post("/refresh")
 def refresh_token(
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     refresh_token: str = Cookie(default=None),
@@ -378,13 +413,19 @@ def refresh_token(
     session.last_used_at = datetime.utcnow()
     db.commit()
 
-    set_auth_cookies(response, new_access, new_refresh)
+    set_auth_cookies(
+        request,
+        response,
+        new_access,
+        new_refresh,
+    )
 
     return {"message": "refreshed"}
 
 
 @router.post("/logout")
 def logout(
+    request: Request,
     response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -400,6 +441,6 @@ def logout(
 
     db.commit()
 
-    clear_auth_cookies(response)
+    clear_auth_cookies(request, response)
 
     return {"message": "Logged out"}
