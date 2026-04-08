@@ -140,11 +140,16 @@ def login(
 ):
     ip = request.client.host
     user_agent = request.headers.get("user-agent")
+    normalized_email = payload.email.strip().lower()
 
     if not check_rate_limit(ip):
         raise HTTPException(429, "Too many requests")
 
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = (
+        db.query(User)
+        .filter(User.email == normalized_email)
+        .first()
+    )
 
     success = False
     reason = None
@@ -153,16 +158,22 @@ def login(
         reason = "user_not_found"
 
     elif user.password_hash is None:
-        raise HTTPException(400, "Use Google login")
+        raise HTTPException(
+            status_code=400,
+            detail="This account was created with Google. Please continue with Google Sign-In."
+        )
 
-    elif not verify_password(payload.password, user.password_hash):
+    elif not verify_password(
+        payload.password,
+        user.password_hash
+    ):
         reason = "invalid_password"
 
     else:
         success = True
 
     audit = LoginAudit(
-        email=payload.email,
+        email=normalized_email,
         ip_address=ip,
         user_agent=user_agent,
         success=success,
@@ -207,7 +218,6 @@ def login(
 
     return {"message": "Login successful"}
 
-
 @router.post("/signup")
 def signup(
     payload: SignupRequest,
@@ -217,8 +227,9 @@ def signup(
 ):
     ip = request.client.host
     user_agent = request.headers.get("user-agent")
+    normalized_email = payload.email.strip().lower()
 
-    if not payload.email.lower().endswith("@gmail.com"):
+    if not normalized_email.endswith("@gmail.com"):
         raise HTTPException(400, "Use a valid Gmail address")
 
     password = payload.password
@@ -235,13 +246,17 @@ def signup(
     if not re.search(r"[^A-Za-z0-9]", password):
         raise HTTPException(400, "Password must include one special symbol")
 
-    existing = db.query(User).filter(User.email == payload.email).first()
+    existing = (
+        db.query(User)
+        .filter(User.email == normalized_email)
+        .first()
+    )
 
     if existing:
         raise HTTPException(400, "User already exists")
 
     user = User(
-        email=payload.email,
+        email=normalized_email,
         password_hash=hash_password(password),
         token_version=0,
     )
@@ -282,7 +297,7 @@ def signup(
     )
 
     return {"message": "Signup successful"}
-
+@router.post("/google")
 
 @router.post("/google")
 def google_login(
@@ -299,9 +314,13 @@ def google_login(
     if not user_info:
         raise HTTPException(401, "Invalid Google token")
 
-    email = user_info["email"]
+    email = user_info["email"].strip().lower()
 
-    user = db.query(User).filter(User.email == email).first()
+    user = (
+        db.query(User)
+        .filter(User.email == email)
+        .first()
+    )
 
     if not user:
         user = User(
