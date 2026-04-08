@@ -385,7 +385,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     )
 
     if (!refreshRes.ok) {
-      throw new Error("Session expired")
+      return res
     }
 
     res = await fetch(url, {

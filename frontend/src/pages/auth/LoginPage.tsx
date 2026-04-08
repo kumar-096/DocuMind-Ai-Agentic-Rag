@@ -45,9 +45,9 @@ export function LoginPage() {
     const ok = await checkAuth()
 
     if (ok) {
-      navigate("/")
+      navigate("/", { replace: true })
     } else {
-      setError("Session setup failed")
+      setError("Authentication state failed to sync")
     }
   }
 

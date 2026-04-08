@@ -38,9 +38,9 @@ function ProtectedRoute({
 function PublicRoute({
   children
 }: {
-  children: JSX.Element
+  children: React.ReactNode
 }) {
-  const { isAuthenticated, loading } = useAuth()
+  const { loading, isAuthenticated } = useAuth()
 
   if (loading) {
     return (
@@ -54,7 +54,7 @@ function PublicRoute({
     return <Navigate to="/" replace />
   }
 
-  return children
+  return <>{children}</>
 }
 
 function AppRoutes() {
