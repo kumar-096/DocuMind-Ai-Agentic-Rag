@@ -3,6 +3,7 @@ import hashlib
 
 from jose import jwt
 from passlib.context import CryptContext
+from passlib.exc import UnknownHashError
 
 from settings import get_settings
 
@@ -11,8 +12,11 @@ settings = get_settings()
 SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
 
+# Supports both:
+# 1) new bcrypt_sha256
+# 2) old legacy bcrypt
 pwd_context = CryptContext(
-    schemes=["bcrypt_sha256"],
+    schemes=["bcrypt_sha256", "bcrypt"],
     deprecated="auto",
 )
 
@@ -38,13 +42,41 @@ def _truncate_password_bytes(password: str) -> str:
 
 
 def hash_password(password: str) -> str:
+    """
+    Always stores passwords using the strongest current scheme.
+    """
     safe_password = _truncate_password_bytes(password)
     return pwd_context.hash(safe_password)
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
+    """
+    Verifies both legacy bcrypt and new bcrypt_sha256 hashes.
+    Prevents crashes on malformed or null hashes.
+    """
+    if not hashed_password:
+        return False
+
     safe_password = _truncate_password_bytes(password)
-    return pwd_context.verify(safe_password, hashed_password)
+
+    try:
+        return pwd_context.verify(safe_password, hashed_password)
+    except UnknownHashError:
+        return False
+
+
+def needs_rehash(hashed_password: str) -> bool:
+    """
+    Returns True if stored hash uses old deprecated scheme
+    and should be upgraded after successful login.
+    """
+    if not hashed_password:
+        return False
+
+    try:
+        return pwd_context.needs_update(hashed_password)
+    except UnknownHashError:
+        return False
 
 
 # -----------------------------
