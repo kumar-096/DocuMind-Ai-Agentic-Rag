@@ -13,12 +13,26 @@ from rag_pipeline import RagPipeline
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+from sqlalchemy import text  # important
 
+@router.get("/health/db")
+def check_db(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))  # FIXED
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 @router.on_event("startup")
 def on_startup():
-    Base.metadata.create_all(bind=engine)
+    print("Initializing database...")
 
-
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("Database ready")
+    except Exception as e:
+        print("Database initialization failed")
+        print("ERROR:", str(e))
+        print("App will continue without DB")
 # ==============================
 #  RATE LIMIT
 # ==============================

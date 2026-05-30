@@ -47,21 +47,41 @@ def safe_generate(prompt: str, temperature: float) -> str:
 async def llm_stream_async(
     prompt: str,
     temperature: float
-) -> AsyncGenerator[str, None]:
-    """
-    Converts Gemini large stream chunks into word-level chunks
-    for smoother frontend typing UX.
-    """
-    for chunk in llm.stream_generate(prompt, temperature):
-        if not chunk:
-            continue
+):
+    max_retries = 3
 
-        words = chunk.split(" ")
+    for attempt in range(max_retries):
+        try:
+            for chunk in llm.stream_generate(prompt, temperature):
+                if not chunk:
+                    continue
 
-        for i, word in enumerate(words):
-            token = word if i == len(words) - 1 else word + " "
+                words = chunk.split(" ")
 
-            yield token
+                for i, word in enumerate(words):
+                    token = word if i == len(words) - 1 else word + " "
+                    yield token
+                    await asyncio.sleep(0.01)
 
-            # smooth typing feel
-            await asyncio.sleep(0.01)
+            return
+
+        except Exception as e:
+            error_text = str(e).lower()
+            print("STREAM ERROR:", error_text)
+
+            transient = [
+                "503",
+                "unavailable",
+                "high demand",
+                "quota",
+                "rate",
+            ]
+
+            if any(x in error_text for x in transient):
+                if attempt < max_retries - 1:
+                    wait_time = 2 + attempt * 3
+                    print(f"Retrying stream in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                    continue
+
+            raise

@@ -99,18 +99,26 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
   /* ---------------- DELETE ---------------- */
   async function handleDelete() {
-    if (!deleteId) return
+  if (!deleteId) return
 
-    try {
-      await fetchWithAuth(`${BASE_URL}/api/sessions/${deleteId}`, {
-        method: "DELETE"
-      })
-      setDeleteId(null)
-      loadSessions(search)
-    } catch (err) {
-      console.error(err)
+  try {
+    await fetchWithAuth(`${BASE_URL}/api/sessions/${deleteId}`, {
+      method: "DELETE"
+    })
+
+    // ✅ clear active session if deleted
+    const stored = localStorage.getItem("active_chat_session")
+    if (stored && Number(stored) === deleteId) {
+      setSessionId(null)
+      setMessages([])
     }
+
+    setDeleteId(null)
+    loadSessions(search)
+  } catch (err) {
+    console.error(err)
   }
+}
 
   /* ---------------- RENAME ---------------- */
   async function handleRename() {

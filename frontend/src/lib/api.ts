@@ -221,42 +221,76 @@ export function askQuestionSSE(
   onToken: (token: string) => void,
   onDone: () => void,
   onError: (err: any) => void
-) { 
+) {
   console.log("🌐 askQuestionSSE called", payload)
-  currentController = new AbortController()
-  let completed = false   //  prevent duplicate onDone
 
-  fetch(`${BASE_URL}/api/chat/ask`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRF-Token": getCSRFToken()
-    },
-    body: JSON.stringify(payload),
-    signal: currentController.signal
-  })
-    .then(async res => {
+  currentController = new AbortController()
+  let completed = false
+
+  const finish = () => {
+    if (!completed) {
+      completed = true
+      onDone()
+    }
+  }
+
+  const startStream = async () => {
+    try {
+      let res = await fetch(`${BASE_URL}/api/chat/ask`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": getCSRFToken()
+        },
+        body: JSON.stringify(payload),
+        signal: currentController?.signal
+      })
+
+      // ✅ auto refresh on expired auth
+      if (res.status === 401) {
+        const refreshRes = await fetch(
+          `${BASE_URL}/api/auth/refresh`,
+          {
+            method: "POST",
+            credentials: "include"
+          }
+        )
+
+        if (!refreshRes.ok) {
+          throw new Error("Invalid authentication token")
+        }
+
+        // retry original SSE request
+        res = await fetch(`${BASE_URL}/api/chat/ask`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": getCSRFToken()
+          },
+          body: JSON.stringify(payload),
+          signal: currentController?.signal
+        })
+      }
+
       if (!res.ok) {
         const text = await res.text()
         throw new Error(text || "Request failed")
       }
 
-      if (!res.body) throw new Error("No stream")
+      if (!res.body) {
+        throw new Error("No stream")
+      }
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ""
 
-      function finish() {
-        if (!completed) {
-          completed = true
-          onDone()
-        }
-      }
+      const read = async () => {
+        try {
+          const { done, value } = await reader.read()
 
-      function read() {
-        reader.read().then(({ done, value }) => {
           if (done) {
             finish()
             return
@@ -272,7 +306,9 @@ export function askQuestionSSE(
 
             if (chunk.startsWith("data: ")) {
               try {
-                const parsed = JSON.parse(chunk.replace("data: ", ""))
+                const parsed = JSON.parse(
+                  chunk.replace("data: ", "")
+                )
 
                 if (parsed.token) onToken(parsed.token)
 
@@ -286,7 +322,6 @@ export function askQuestionSSE(
                   finish()
                   return
                 }
-
               } catch (err) {
                 console.error("SSE parse error:", err)
               }
@@ -296,12 +331,18 @@ export function askQuestionSSE(
           }
 
           read()
-        }).catch(onError)
+        } catch (err) {
+          onError(err)
+        }
       }
 
       read()
-    })
-    .catch(onError)
+    } catch (err) {
+      onError(err)
+    }
+  }
+
+  startStream()
 
   return () => {
     if (currentController) {

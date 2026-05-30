@@ -1,4 +1,10 @@
-import { createContext, useContext, useState } from "react"
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect
+} from "react"
+import { fetchWithAuth } from "../lib/api"
 
 type Message = {
   id: string
@@ -8,24 +14,61 @@ type Message = {
 
 type ChatContextType = {
   sessionId: number | null
-  setSessionId: (id: number) => void
-
+  setSessionId: (id: number | null) => void
   messages: Message[]
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
 }
 
 const ChatContext = createContext<ChatContextType | null>(null)
 
-export function ChatProvider({ children }: { children: React.ReactNode }) {
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 
-  const [sessionId, setSessionIdState] = useState<number | null>(() => {
-    const stored = localStorage.getItem("active_chat_session")
-    return stored ? Number(stored) : null
-  })
-
+export function ChatProvider({
+  children
+}: {
+  children: React.ReactNode
+}) {
+  const [sessionId, setSessionIdState] = useState<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
 
-  function setSessionId(id: number) {
+  // ✅ validate restored session on startup
+  useEffect(() => {
+    const restoreSession = async () => {
+      const stored = localStorage.getItem("active_chat_session")
+
+      if (!stored) return
+
+      const parsedId = Number(stored)
+
+      try {
+        const res = await fetchWithAuth(
+          `${BASE_URL}/api/sessions/${parsedId}/messages`
+        )
+
+        if (!res.ok) {
+          localStorage.removeItem("active_chat_session")
+          setSessionIdState(null)
+          return
+        }
+
+        setSessionIdState(parsedId)
+      } catch {
+        localStorage.removeItem("active_chat_session")
+        setSessionIdState(null)
+      }
+    }
+
+    restoreSession()
+  }, [])
+
+  function setSessionId(id: number | null) {
+    if (id === null) {
+      localStorage.removeItem("active_chat_session")
+      setSessionIdState(null)
+      return
+    }
+
     localStorage.setItem("active_chat_session", String(id))
     setSessionIdState(id)
   }

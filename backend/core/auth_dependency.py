@@ -41,7 +41,14 @@ def get_current_user(
             detail="Invalid authentication token",
         )
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    try:
+        user = db.query(User).filter(User.id == int(user_id)).first()
+    except Exception as e:
+        print("DB AUTH ERROR:", str(e))
+        raise HTTPException(
+            status_code=503,
+            detail="Database unavailable"
+        )
 
     if not user:
         raise HTTPException(
